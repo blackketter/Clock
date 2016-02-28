@@ -82,10 +82,10 @@ class Clock : public Time {
     millis_t nowMillis() { return getMillis(); }
 
     void set(time_t newTime);
-    void setMillis(millis_t newTime) { set(newTime/1000);  /* todo: set millis_offset */ }
+    void setMillis(millis_t newTime) { set(newTime/1000);  millis_offset = Uptime::millis() - newTime%1000;  }
 
-    virtual void adjust(stime_t adjustment); // signed time
-    // todo: adjustMillis()
+    virtual void adjust(stime_t adjustment); // signed delta seconds
+    virtual void adjustMillis(millis_t adjustment) {  setMillis(getMillis()+adjustment); }  // signed delta millis
 
     virtual bool hasBeenSet() { return doneSet && !setting; }
     virtual void beginSetTime() { setting = true;};
