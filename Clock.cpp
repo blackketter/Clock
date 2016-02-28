@@ -129,32 +129,39 @@ uint16_t Clock::frac() {
 
 time_t getRTCTime()
 {
+#if defined(CORE_TEENSY)
   return Teensy3Clock.get();
+#else
+  return 0;
+#endif
 }
 
 Clock::Clock() {
     setSyncProvider(getRTCTime);
     if (timeStatus()!= timeSet || year() < 2015) {
-//      DEBUG_LN("Unable to sync with the RTC");
       // set clock to a recent time - not needed with RTC
       ::setTime(16,20,0,1,1,2015);
     } else {
-//      DEBUG_LN("RTC has set the system time");
       doneSet = true;
     }
 }
 
 void Clock::set(time_t newTime) {
+#if defined(CORE_TEENSY)
   Teensy3Clock.set(newTime);
+#endif
   ::setTime(newTime);
 }
 
 
 void Clock::adjust(stime_t adjustment) {
+#if defined(CORE_TEENSY)
   Teensy3Clock.set(now() + adjustment);
-
   // force a resync
   setSyncProvider(getRTCTime);
+#else
+  ::adjustTime(adjustment);
+#endif
 
   doneSet = true;
 

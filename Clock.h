@@ -37,10 +37,10 @@ class Time {
     const char* monthString(uint8_t m = 0); // zero means current month
 
     uint8_t daysInMonth(uint8_t m = 0);  // zero means current month, months are 1 based
-    const time_t secsPerMin = 60;
-    const time_t secsPerHour = 60*60;
-    const time_t secsPerDay = 60*60*24;
-    const time_t secsPerYear = 60*60*24*365;
+    const time_t secsPerMin = 60L;
+    const time_t secsPerHour = 60L*60;
+    const time_t secsPerDay = 60L*60*24;
+    const time_t secsPerYear = 60L*60*24*365;
 
   protected:
     time_t curTime = 0;
