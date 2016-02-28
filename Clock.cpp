@@ -60,7 +60,7 @@ void Time::longTime(char * timeStr) {
 
 static const uint8_t monthDays[]={31,28,31,30,31,30,31,31,30,31,30,31}; // API starts months from 1, this array starts from 0
 
-// todo: internationalization & localization of names, reuse DateStrings.cpp if possible
+// todo: internationalization & localization of names, reuse DateStrings.cpp if possible (the table is not exposed currently)
 static const char* dayStrings[] = { "", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
 static const char* monthStrings[] = { "", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December" };
 
@@ -162,7 +162,7 @@ time_t getTeensyRTCTime()
 TeensyRTCClock::TeensyRTCClock() {
   setSyncProvider(getTeensyRTCTime);
   if (timeStatus()!= timeSet || year() < 2015) {
-    // set clock to a recent time - not needed with RTC
+    // set clock to a recent time - not needed if the RTC is set
     // a recent time seems more friendly than 1970, though 1970 was a pretty friendly year.
     ::setTime(16,20,0,1,1,2015);
   } else {
