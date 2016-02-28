@@ -1,0 +1,19 @@
+{
+"name": "Clock",
+"frameworks": "Arduino",
+"keywords": "Clock Millisecond Date Time",
+"description": "Clock Utility Library",
+"url": "https://github.com/blackketter/Clock",
+"authors":
+[
+{
+        "name": "Dean Blackketter"
+}
+],
+"repository":
+{
+    "type": "git",
+    "url": "https://github.com/blackketter/Clock"
+}
+}
+

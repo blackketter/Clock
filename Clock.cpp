@@ -59,6 +59,8 @@ void Time::longTime(char * timeStr) {
 };
 
 static const uint8_t monthDays[]={31,28,31,30,31,30,31,31,30,31,30,31}; // API starts months from 1, this array starts from 0
+
+// todo: internationalization & localization of names
 static const char* dayStrings[] = { "", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
 static const char* monthStrings[] = { "", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December" };
 
@@ -73,8 +75,17 @@ const char* Time::monthString(uint8_t m) {
 }
 
 uint8_t Time::daysInMonth(uint8_t m) {
-  // todo: make this work for leap years
-  if (m == 0) { m = month(); }
+  if (m == 0) {
+    m = month();
+    if (m==2) {
+      int16_t y = year();
+      if ((y % 4) != 0) return 28;
+      if ((y % 100) != 100) return 29;
+      if ((y % 400) != 400) return 28;
+      return 29;
+    }
+  }
+
   return monthDays[m-1]; // m is 1 based, the array is zero based
 }
 
@@ -108,7 +119,7 @@ time_t DayTime::nextOccurance() {
 };
 
 // real time clock methods
-time_t Clock::now() {
+time_t Clock::get() {
   static time_t last_sec = 0;
 
   time_t now_sec = ::now();
@@ -122,7 +133,7 @@ time_t Clock::now() {
 }
 
 uint16_t Clock::frac() {
-  now();
+  get();
 
   return Uptime::millis() - millis_offset;
 }

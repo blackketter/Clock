@@ -9,8 +9,13 @@ typedef int32_t stime_t; // signed time for relative time, deltas, adjustments, 
 class Time {
   public:
     Time() {};
-    virtual time_t get() { return curTime; };
-    virtual void set(time_t newTime) { curTime = newTime; }
+
+    virtual time_t get() { return curTimeMillis/1000; }
+    virtual millis_t getMillis() { return curTimeMillis; }
+    virtual uint16_t frac() { return curTimeMillis%1000; }
+
+    virtual void set(time_t newTime) { curTimeMillis = (millis_t)newTime * 1000; }
+    virtual void set(millis_t newTime) { curTimeMillis = newTime; }
 
     virtual void set(uint16_t y, uint8_t m = 1, uint8_t d = 1, uint8_t hr = 0, uint8_t min = 0, uint8_t sec = 0);
     virtual void adjust(stime_t adjustment) { set(get() + adjustment); } // signed time
@@ -43,7 +48,7 @@ class Time {
     const time_t secsPerYear = 60L*60*24*365;
 
   protected:
-    time_t curTime = 0;
+    millis_t curTimeMillis = 0;
 
 };
 
@@ -60,19 +65,27 @@ class Uptime : public Time {
   public:
     static millis_t millis();
     time_t get() { return millis()/1000; }
+    millis_t getMillis() { return millis(); }
 };
 
 class Clock : public Time {
 
   public:
     Clock();
-    time_t now();
 
-    virtual void set(time_t newTime);
-    virtual time_t get() { return now(); };
-    virtual void adjust(stime_t adjustment); // signed time
+    time_t get();
+    millis_t getMillis() { return get()*1000+frac(); }
+    uint16_t frac();  // fractional seconds in millis
 
-    uint16_t frac();  // fractional seconds in millis  TODO: Make base Time class support fractional seconds too
+    // convenience for the old syntax
+    time_t now() { return get(); }
+    millis_t nowMillis() { return getMillis(); }
+
+    void set(time_t newTime);
+    void setMillis(millis_t newTime) { set(newTime/1000);  /* todo: set millis_offset */ }
+
+    void adjust(stime_t adjustment); // signed time
+    // todo: adjustMillis()
 
     virtual bool hasBeenSet() { return doneSet && !setting; }
     virtual void beginSetTime() { setting = true;};
