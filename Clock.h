@@ -58,7 +58,7 @@ class DayTime : public Time {
     virtual void set(time_t newTime) {  Time::set(newTime % secsPerDay); }
     virtual void adjust(stime_t adjustment)  { if (adjustment < 0) { adjustment = secsPerDay-((-adjustment)%secsPerDay); } set(adjustment+get()); };
     virtual bool isTime(time_t newTime) { return get() == (newTime % secsPerDay); }
-    virtual time_t nextOccurance();
+    virtual time_t nextOccurance(time_t starting);
 };
 
 class Uptime : public Time {
@@ -84,20 +84,27 @@ class Clock : public Time {
     void set(time_t newTime);
     void setMillis(millis_t newTime) { set(newTime/1000);  /* todo: set millis_offset */ }
 
-    void adjust(stime_t adjustment); // signed time
+    virtual void adjust(stime_t adjustment); // signed time
     // todo: adjustMillis()
 
     virtual bool hasBeenSet() { return doneSet && !setting; }
     virtual void beginSetTime() { setting = true;};
     virtual void endSetTime() { setting = false; } ;
 
-  private:
+  protected:
     millis_t millis_offset = 0;
 
     bool doneSet = false;
     bool setting = false;
 };
 
-extern Clock clock;
+#if defined(CORE_TEENSY)
+class TeensyRTCClock : public Clock {
+  public:
+    TeensyRTCClock();
+    void set(time_t newTime) { Teensy3Clock.set(newTime);  Clock::set(newTime); }
+    void adjust(stime_t adjustment); // signed time
+};
+#endif
 
 #endif

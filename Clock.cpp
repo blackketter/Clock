@@ -110,9 +110,9 @@ millis_t Uptime::millis() {
   return nowUptime + uptimeOffset;
 }
 
-time_t DayTime::nextOccurance() {
-  time_t nextup = (clock.now()/secsPerDay)*secsPerDay + get();
-  if (nextup < clock.now()) {
+time_t DayTime::nextOccurance(time_t starting) {
+  time_t nextup = (starting/secsPerDay)*secsPerDay + get();
+  if (nextup < starting) {
     nextup+= secsPerDay;
   }
   return nextup;
@@ -138,43 +138,43 @@ uint16_t Clock::frac() {
   return Uptime::millis() - millis_offset;
 }
 
-time_t getRTCTime()
-{
-#if defined(CORE_TEENSY)
-  return Teensy3Clock.get();
-#else
-  return 0;
-#endif
-}
-
 Clock::Clock() {
-    setSyncProvider(getRTCTime);
-    if (timeStatus()!= timeSet || year() < 2015) {
-      // set clock to a recent time - not needed with RTC
-      ::setTime(16,20,0,1,1,2015);
-    } else {
-      doneSet = true;
-    }
 }
 
 void Clock::set(time_t newTime) {
-#if defined(CORE_TEENSY)
-  Teensy3Clock.set(newTime);
-#endif
   ::setTime(newTime);
 }
 
 
 void Clock::adjust(stime_t adjustment) {
-#if defined(CORE_TEENSY)
-  Teensy3Clock.set(now() + adjustment);
-  // force a resync
-  setSyncProvider(getRTCTime);
-#else
   ::adjustTime(adjustment);
-#endif
-
   doneSet = true;
-
 }
 
+
+#if defined(CORE_TEENSY)
+time_t getTeensyRTCTime()
+{
+  return Teensy3Clock.get();
+  return 0;
+}
+
+TeensyRTCClock::TeensyRTCClock() {
+  setSyncProvider(getTeensyRTCTime);
+  if (timeStatus()!= timeSet || year() < 2015) {
+    // set clock to a recent time - not needed with RTC
+    // a recent time seems more friendly than 1970, though 1970 was a pretty friendly year.
+    ::setTime(16,20,0,1,1,2015);
+  } else {
+    doneSet = true;
+  }
+}
+
+void TeensyRTCClock::adjust(stime_t adjustment) {
+  Teensy3Clock.set(now() + adjustment);
+
+  // force a resync
+  setSyncProvider(getTeensyRTCTime);
+  doneSet = true;
+}
+#endif
