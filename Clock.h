@@ -10,7 +10,7 @@ typedef int64_t millis_t;
 typedef int32_t stime_t;
 
 
-// Time is a base class that is abased time and has utility functions for getting information about that time
+// Time is a base class that represents a time and provides utility functions for getting information about that time
 // Time does not change unless you set() it.   Use Clock (or one of its descendents) for a real-time clock.
 class Time {
   public:
