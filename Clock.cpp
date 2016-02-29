@@ -97,6 +97,22 @@ void Time::shortDate(char* dateStr) {
   sprintf(dateStr, "%d-%02d-%02d", year(), month(), day());
 }
 
+// Use separate rollover calculations for millis() and micros() for efficiency.
+// todo: Find a simpler solution.
+
+micros_t Uptime::micros() {
+  static micros_t lastUptime = 0;
+  static micros_t uptimeOffset = 0;
+
+  micros_t nowUptime = ::micros();
+  if (nowUptime < lastUptime) {
+    // micros have rolled over, we add a new offset
+    uptimeOffset += 0x0000000100000000;
+  }
+  lastUptime = nowUptime;
+  return nowUptime + uptimeOffset;
+}
+
 millis_t Uptime::millis() {
   static millis_t lastUptime = 0;
   static millis_t uptimeOffset = 0;
@@ -125,17 +141,17 @@ time_t Clock::get() {
   time_t now_sec = ::now();
 
   if (now_sec != last_sec) {
-    millis_offset = Uptime::millis();
+    micros_offset = Uptime::micros();
     last_sec = now_sec;
   }
 
   return now_sec;
 }
 
-uint16_t Clock::frac() {
+uint32_t Clock::fracMicros() {
   get();
 
-  return Uptime::millis() - millis_offset;
+  return Uptime::micros() - micros_offset;
 }
 
 Clock::Clock() {

@@ -3,12 +3,14 @@
 
 #include "TimeLib.h"
 
-// milliseconds are always expressed as 64-bit numbers, to avoid rollover
-typedef int64_t millis_t;
-
 // signed time for relative time, deltas, adjustments, etc.
 typedef int32_t stime_t;
 
+// milliseconds are always expressed as 64-bit numbers, to avoid rollover
+typedef int64_t millis_t;
+
+// microseconds are always expressed as 64-bit numbers, to avoid rollover
+typedef int64_t micros_t;
 
 // Time is a base class that represents a time and provides utility functions for getting information about that time
 // Time does not change unless you set() it.   Use Clock (or one of its descendents) for a real-time clock.
@@ -16,16 +18,20 @@ class Time {
   public:
     Time() {};
 
-    virtual time_t get() { return millisTime/1000; } // seconds since 1970-01-01
-    virtual millis_t getMillis() { return millisTime; }  // milliseconds since 1970-01-01
-    virtual uint16_t frac() { return millisTime%1000; } // milliseconds since the last second expired
+    virtual time_t get() { return microsTime/1000; } // seconds since 1970-01-01
+    virtual millis_t getMillis() { return microsTime/1000; }  // milliseconds since 1970-01-01
+    virtual micros_t getMicros() { return microsTime; }  // microseconds since 1970-01-01
+    virtual uint32_t fracMicros() { return microsTime%1000000; } // microseconds since the last second expired
+    virtual uint16_t fracMillis() { return microsTime%1000; } // microseconds since the last second expired
 
-    virtual void set(time_t newTime) { millisTime = (millis_t)newTime * 1000; }
-    virtual void setMillis(millis_t newTime) { millisTime = newTime; }
+    virtual void set(time_t newTime) { microsTime = (micros_t)newTime * 1000000; }
+    virtual void setMillis(millis_t newTime) { microsTime = (micros_t)newTime*1000; }
+    virtual void setMicros(micros_t newTime) { microsTime = newTime; }
 
     virtual void set(uint16_t y, uint8_t m = 1, uint8_t d = 1, uint8_t hr = 0, uint8_t min = 0, uint8_t sec = 0);
     virtual void adjust(stime_t adjustment) { set(get() + adjustment); } // signed time
     virtual void adjustMillis(millis_t adjustment) {  setMillis(getMillis()+adjustment); }  // signed delta millis
+    virtual void adjustMicros(micros_t adjustment) {  setMicros(getMicros()+adjustment); }  // signed delta micros
 
     virtual bool isTime(time_t newTime) { return newTime == get(); }
 
@@ -56,7 +62,7 @@ class Time {
     const time_t secsPerYear = 60L*60*24*365;
 
   protected:
-    millis_t millisTime = 0;
+    micros_t microsTime = 0;
 
 };
 
@@ -69,30 +75,36 @@ class DayTime : public Time {
     virtual time_t nextOccurance(time_t starting);
 };
 
-// Uptime provides a Time that is tied to the millis() since the system started.  Easiest access is by Uptime::millis()
+// Uptime provides a Time that is tied to the micros() since the system started.  Easiest access is by Uptime::millis() or Uptime::micros()
 class Uptime : public Time {
   public:
     static millis_t millis();
+    static micros_t micros();
     time_t get() { return millis()/1000; }
     millis_t getMillis() { return millis(); }
+    micros_t getMicros() { return micros(); }
 };
 
-// Clock provides a Time that progresses in real time, without a separate RTC
+// Clock provides a Time that progresses in real time, without a separate RTC, assumes the RTC only has second resolution
 class Clock : public Time {
 
   public:
     Clock();
 
     time_t get();
-    millis_t getMillis() { return get()*1000+frac(); }
-    uint16_t frac();  // fractional seconds in millis
+    millis_t getMillis() { return get()*1000+fracMillis(); }
+    micros_t getMicros() { return get()*1000+fracMicros(); }
+    uint16_t fracMillis() { return fracMicros()/1000; }  // fractional seconds in millis
+    uint32_t fracMicros();  // fractional seconds in micros
 
     // convenience for the old syntax
     time_t now() { return get(); }
     millis_t nowMillis() { return getMillis(); }
+    micros_t nowMicros() { return getMicros(); }
 
     void set(time_t newTime);
-    void setMillis(millis_t newTime) { set(newTime/1000);  millis_offset = Uptime::millis() - newTime%1000;  }
+    void setMillis(millis_t newTime) { set(newTime/1000);  micros_offset = Uptime::micros() - newTime%1000;  }
+    void setMicros(micros_t newTime) { set(newTime/1000000);  micros_offset = Uptime::micros() - newTime%1000000;  }
 
     virtual void adjust(stime_t adjustment); // signed delta seconds
 
@@ -101,7 +113,7 @@ class Clock : public Time {
     virtual void endSetTime() { setting = false; } ;
 
   protected:
-    millis_t millis_offset = 0;
+    micros_t micros_offset = 0;
 
     bool doneSet = false;
     bool setting = false;
