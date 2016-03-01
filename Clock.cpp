@@ -11,43 +11,43 @@ void Time::set(uint16_t y, uint8_t m, uint8_t d, uint8_t hr, uint8_t min, uint8_
   tmE.Hour = hr;
   tmE.Minute = min;
   tmE.Second = sec;
-  set(makeTime(tmE));
+  setSeconds(makeTime(tmE));
 }
 
 uint8_t Time::hourFormat12() {
-  return ::hourFormat12(get());
+  return ::hourFormat12(getSeconds());
 }
 
 uint8_t Time::hour() {
-  return ::hour(get());
+  return ::hour(getSeconds());
 }
 
 uint8_t Time::minute() {
-  return ::minute(get());
+  return ::minute(getSeconds());
 }
 
 uint8_t Time::second() {
-  return ::second(get());
+  return ::second(getSeconds());
 }
 
 uint16_t Time::year() {
-  return ::year(get());
+  return ::year(getSeconds());
 }
 
 uint8_t Time::month() {
-  return ::month(get());
+  return ::month(getSeconds());
 }
 
 uint8_t Time::day() {
-  return ::day(get());
+  return ::day(getSeconds());
 }
 
 uint8_t Time::weekday() {
-  return ::weekday(get());
+  return ::weekday(getSeconds());
 }
 
 bool Time::isAM() {
-  return ::isAM(get());
+  return ::isAM(getSeconds());
 }
 
 void Time::shortTime(char * timeStr) {
@@ -98,7 +98,7 @@ void Time::shortDate(char* dateStr) {
 }
 
 // Use separate rollover calculations for millis() and micros() for efficiency.
-// todo: Find a simpler solution.
+// todo: Find a simpler solution and move the offsets into static class fields
 
 micros_t Uptime::micros() {
   static micros_t lastUptime = 0;
@@ -127,7 +127,7 @@ millis_t Uptime::millis() {
 }
 
 time_t DayTime::nextOccurance(time_t starting) {
-  time_t nextup = (starting/secsPerDay)*secsPerDay + get();
+  time_t nextup = (starting/secsPerDay)*secsPerDay + getSeconds();
   if (nextup < starting) {
     nextup+= secsPerDay;
   }
@@ -135,7 +135,7 @@ time_t DayTime::nextOccurance(time_t starting) {
 };
 
 // real time clock methods
-time_t Clock::get() {
+time_t Clock::getSeconds() {
   static time_t last_sec = 0;
 
   time_t now_sec = ::now();
@@ -148,23 +148,18 @@ time_t Clock::get() {
   return now_sec;
 }
 
-uint32_t Clock::fracMicros() {
-  get();
+void Clock::setMicros(micros_t newTime) {
+  ::setTime(newTime/microsPerSec);
+  micros_offset = Uptime::micros() - newTime%microsPerSec;
+  doneSet = true;
+}
 
+uint32_t Clock::fracMicros() {
+  getSeconds();
   return Uptime::micros() - micros_offset;
 }
 
 Clock::Clock() {
-}
-
-void Clock::set(time_t newTime) {
-  ::setTime(newTime);
-}
-
-
-void Clock::adjust(stime_t adjustment) {
-  ::adjustTime(adjustment);
-  doneSet = true;
 }
 
 
@@ -172,7 +167,7 @@ void Clock::adjust(stime_t adjustment) {
 time_t getTeensyRTCTime()
 {
   return Teensy3Clock.get();
-  return 0;
+//  return 0;
 }
 
 TeensyRTCClock::TeensyRTCClock() {
@@ -180,17 +175,19 @@ TeensyRTCClock::TeensyRTCClock() {
   if (timeStatus()!= timeSet || year() < 2015) {
     // set clock to a recent time - not needed if the RTC is set
     // a recent time seems more friendly than 1970, though 1970 was a pretty friendly year.
-    ::setTime(16,20,0,1,1,2015);
+    // disabling this because it might just be dumb
+    //::setTime(16,20,0,1,1,2015);
   } else {
     doneSet = true;
   }
 }
 
-void TeensyRTCClock::adjust(stime_t adjustment) {
-  Teensy3Clock.set(now() + adjustment);
-
-  // force a resync
-  setSyncProvider(getTeensyRTCTime);
-  doneSet = true;
+void TeensyRTCClock::setMicros(micros_t newTime) {
+    Teensy3Clock.set(newTime/microsPerSec);
+    Clock::setMicros(newTime);
+    // force a resync
+    setSyncProvider(getTeensyRTCTime);
+    doneSet = true;
 }
+
 #endif

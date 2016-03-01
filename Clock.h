@@ -18,22 +18,22 @@ class Time {
   public:
     Time() {};
 
-    virtual time_t get() { return microsTime/1000; } // seconds since 1970-01-01
-    virtual millis_t getMillis() { return microsTime/1000; }  // milliseconds since 1970-01-01
+    virtual time_t getSeconds() { return microsTime/microsPerSec; } // seconds since 1970-01-01
+    virtual millis_t getMillis() { return microsTime/microsPerMilli; }  // milliseconds since 1970-01-01
     virtual micros_t getMicros() { return microsTime; }  // microseconds since 1970-01-01
-    virtual uint32_t fracMicros() { return microsTime%1000000; } // microseconds since the last second expired
-    virtual uint16_t fracMillis() { return microsTime%1000; } // microseconds since the last second expired
+    virtual uint32_t fracMicros() { return microsTime%microsPerSec; } // microseconds since the last second expired
+    virtual uint16_t fracMillis() { return microsTime%microsPerMilli; } // microseconds since the last second expired
 
-    virtual void set(time_t newTime) { microsTime = (micros_t)newTime * 1000000; }
-    virtual void setMillis(millis_t newTime) { microsTime = (micros_t)newTime*1000; }
     virtual void setMicros(micros_t newTime) { microsTime = newTime; }
+    virtual void setMillis(millis_t newTime) { setMicros((micros_t)newTime*microsPerMilli); }
+    virtual void setSeconds(time_t newTime) { setMicros((micros_t)newTime * microsPerSec); }
 
     virtual void set(uint16_t y, uint8_t m = 1, uint8_t d = 1, uint8_t hr = 0, uint8_t min = 0, uint8_t sec = 0);
-    virtual void adjust(stime_t adjustment) { set(get() + adjustment); } // signed time
+    virtual void adjustSeconds(stime_t adjustment) { setSeconds(getSeconds() + adjustment); } // signed time
     virtual void adjustMillis(millis_t adjustment) {  setMillis(getMillis()+adjustment); }  // signed delta millis
     virtual void adjustMicros(micros_t adjustment) {  setMicros(getMicros()+adjustment); }  // signed delta micros
 
-    virtual bool isTime(time_t newTime) { return newTime == get(); }
+    virtual bool isTime(time_t newTime) { return newTime == getSeconds(); }
 
     virtual void beginSetTime() {};
     virtual void endSetTime() {};
@@ -59,7 +59,20 @@ class Time {
     const time_t secsPerMin = 60L;
     const time_t secsPerHour = 60L*60;
     const time_t secsPerDay = 60L*60*24;
-    const time_t secsPerYear = 60L*60*24*365;
+    const time_t secsPerYear = 60L*60*24*365;  // approximately
+
+    const millis_t millisPerSec = 1000;
+    const millis_t millisPerMin = secsPerMin*millisPerSec;
+    const millis_t millisPerHour = secsPerHour*millisPerSec;
+    const millis_t millisPerDay = secsPerDay*millisPerSec;
+    const millis_t millisPerYear = secsPerYear*millisPerSec;
+
+    const micros_t microsPerMilli = 1000;
+    const micros_t microsPerSec = 1000000;
+    const micros_t microsPerMin = secsPerMin*microsPerSec;
+    const micros_t microsPerHour = secsPerHour*microsPerSec;
+    const micros_t microsPerDay = secsPerDay*microsPerSec;
+    const micros_t microsPerYear = secsPerYear*microsPerSec;
 
   protected:
     micros_t microsTime = 0;
@@ -69,9 +82,9 @@ class Time {
 // DayTime provides a time of day for a single day, it's value can be in the range 0 to secsPerDay.  Useful for daily recurring alarms.
 class DayTime : public Time {
   public:
-    virtual void set(time_t newTime) {  Time::set(newTime % secsPerDay); }
-    virtual void adjust(stime_t adjustment)  { if (adjustment < 0) { adjustment = secsPerDay-((-adjustment)%secsPerDay); } set(adjustment+get()); };
-    virtual bool isTime(time_t newTime) { return get() == (newTime % secsPerDay); }
+    virtual void setMicros(micros_t newTime) {  Time::setMicros(newTime % microsPerDay); }
+    virtual void adjustMicros(micros_t adjustment)  { if (adjustment < 0) { adjustment = microsPerDay-((-adjustment)%microsPerDay); } setMicros(adjustment+getMicros()); };
+    virtual bool isTime(time_t newTime) { return getSeconds() == (newTime % secsPerDay); }
     virtual time_t nextOccurance(time_t starting);
 };
 
@@ -80,7 +93,7 @@ class Uptime : public Time {
   public:
     static millis_t millis();
     static micros_t micros();
-    time_t get() { return millis()/1000; }
+    time_t getSeconds() { return millis()/millisPerSec; }
     millis_t getMillis() { return millis(); }
     micros_t getMicros() { return micros(); }
 };
@@ -91,22 +104,16 @@ class Clock : public Time {
   public:
     Clock();
 
-    time_t get();
-    millis_t getMillis() { return get()*1000+fracMillis(); }
-    micros_t getMicros() { return get()*1000+fracMicros(); }
-    uint16_t fracMillis() { return fracMicros()/1000; }  // fractional seconds in millis
+    time_t getSeconds();
+    millis_t getMillis() { return getSeconds()*millisPerSec+fracMillis(); }
+    micros_t getMicros() { return getSeconds()*microsPerSec+fracMicros(); }
+    uint16_t fracMillis() { return fracMicros()/microsPerMilli; }  // fractional seconds in millis
     uint32_t fracMicros();  // fractional seconds in micros
 
     // convenience for the old syntax
-    time_t now() { return get(); }
-    millis_t nowMillis() { return getMillis(); }
-    micros_t nowMicros() { return getMicros(); }
+    time_t now() { return getSeconds(); }
 
-    void set(time_t newTime);
-    void setMillis(millis_t newTime) { set(newTime/1000);  micros_offset = Uptime::micros() - newTime%1000;  }
-    void setMicros(micros_t newTime) { set(newTime/1000000);  micros_offset = Uptime::micros() - newTime%1000000;  }
-
-    virtual void adjust(stime_t adjustment); // signed delta seconds
+    void setMicros(micros_t newTime);
 
     virtual bool hasBeenSet() { return doneSet && !setting; }
     virtual void beginSetTime() { setting = true;};
@@ -124,8 +131,7 @@ class Clock : public Time {
 class TeensyRTCClock : public Clock {
   public:
     TeensyRTCClock();
-    void set(time_t newTime) { Teensy3Clock.set(newTime);  Clock::set(newTime); }
-    void adjust(stime_t adjustment); // signed time
+    void setMicros(micros_t newTime);
 };
 #endif
 
