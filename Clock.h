@@ -28,7 +28,7 @@ class Time {
     virtual void setMillis(millis_t newTime) { setMicros((micros_t)newTime*microsPerMilli); }
     virtual void setSeconds(time_t newTime) { setMicros((micros_t)newTime * microsPerSec); }
 
-    virtual void set(uint16_t y, uint8_t m = 1, uint8_t d = 1, uint8_t hr = 0, uint8_t min = 0, uint8_t sec = 0);
+    virtual void setDateTime(uint16_t y, uint8_t m = 1, uint8_t d = 1, uint8_t hr = 0, uint8_t min = 0, uint8_t sec = 0);
     virtual void adjustSeconds(stime_t adjustment) { setSeconds(getSeconds() + adjustment); } // signed time
     virtual void adjustMillis(millis_t adjustment) {  setMillis(getMillis()+adjustment); }  // signed delta millis
     virtual void adjustMicros(micros_t adjustment) {  setMicros(getMicros()+adjustment); }  // signed delta micros
