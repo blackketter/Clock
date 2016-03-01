@@ -3,7 +3,7 @@
 
 #include "Clock.h"
 
-void Time::set(uint16_t y, uint8_t m, uint8_t d, uint8_t hr, uint8_t min, uint8_t sec) {
+void Time::setDateTime(uint16_t y, uint8_t m, uint8_t d, uint8_t hr, uint8_t min, uint8_t sec) {
   TimeElements tmE;
   tmE.Year = y - 1970;
   tmE.Month = m;
