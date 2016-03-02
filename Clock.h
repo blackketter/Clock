@@ -1,5 +1,7 @@
 #ifndef _Clock_
 #define _Clock_
+#include <Debug.h>
+
 
 #include "TimeLib.h"
 
@@ -15,6 +17,7 @@ typedef int64_t micros_t;
 // Time is a base class that represents a time and provides utility functions for getting information about that time
 // Time does not change unless you set() it.   Use Clock (or one of its descendents) for a real-time clock.
 class Time {
+
   public:
     Time() {};
 
@@ -24,13 +27,13 @@ class Time {
     virtual uint32_t fracMicros() { return microsTime%microsPerSec; } // microseconds since the last second expired
     virtual uint16_t fracMillis() { return microsTime%microsPerMilli; } // microseconds since the last second expired
 
-    virtual void setMicros(micros_t newTime) { microsTime = newTime; }
-    virtual void setMillis(millis_t newTime) { setMicros((micros_t)newTime*microsPerMilli); }
-    virtual void setSeconds(time_t newTime) { setMicros((micros_t)newTime * microsPerSec); }
+    void setMicros(micros_t newTime);  // todo: making this virtual causes a crash!
+    void setMillis(millis_t newTime);
+    void setSeconds(time_t newTime);
 
     virtual void setDateTime(uint16_t y, uint8_t m = 1, uint8_t d = 1, uint8_t hr = 0, uint8_t min = 0, uint8_t sec = 0);
-    virtual void adjustSeconds(stime_t adjustment) { setSeconds(getSeconds() + adjustment); } // signed time
-    virtual void adjustMillis(millis_t adjustment) {  setMillis(getMillis()+adjustment); }  // signed delta millis
+    void adjustSeconds(stime_t adjustment) { setSeconds(getSeconds() + adjustment); } // signed time
+    void adjustMillis(millis_t adjustment) {  setMillis(getMillis()+adjustment); }  // signed delta millis
     virtual void adjustMicros(micros_t adjustment) {  setMicros(getMicros()+adjustment); }  // signed delta micros
 
     virtual bool isTime(time_t newTime) { return newTime == getSeconds(); }
@@ -56,27 +59,25 @@ class Time {
     const char* monthString(uint8_t m = 0); // zero means current month
     uint8_t daysInMonth(uint8_t m = 0);  // zero means current month, months are 1 based
 
-    const time_t secsPerMin = 60L;
-    const time_t secsPerHour = 60L*60;
-    const time_t secsPerDay = 60L*60*24;
-    const time_t secsPerYear = 60L*60*24*365;  // approximately
+    static const time_t secsPerMin = 60L;
+    static const time_t secsPerHour = 60L*60;
+    static const time_t secsPerDay = 60L*60*24;
+    static const time_t secsPerYear = 60L*60*24*365;  // approximately
 
-    const millis_t millisPerSec = 1000;
-    const millis_t millisPerMin = secsPerMin*millisPerSec;
-    const millis_t millisPerHour = secsPerHour*millisPerSec;
-    const millis_t millisPerDay = secsPerDay*millisPerSec;
-    const millis_t millisPerYear = secsPerYear*millisPerSec;
+    static const millis_t millisPerSec = 1000;
+    static const millis_t millisPerMin = secsPerMin*millisPerSec;
+    static const millis_t millisPerHour = secsPerHour*millisPerSec;
+    static const millis_t millisPerDay = secsPerDay*millisPerSec;
+    static const millis_t millisPerYear = secsPerYear*millisPerSec;
 
-    const micros_t microsPerMilli = 1000;
-    const micros_t microsPerSec = 1000000;
-    const micros_t microsPerMin = secsPerMin*microsPerSec;
-    const micros_t microsPerHour = secsPerHour*microsPerSec;
-    const micros_t microsPerDay = secsPerDay*microsPerSec;
-    const micros_t microsPerYear = secsPerYear*microsPerSec;
-
-  protected:
+    static const micros_t microsPerMilli = 1000;
+    static const micros_t microsPerSec = 1000000;
+    static const micros_t microsPerMin = secsPerMin*microsPerSec;
+    static const micros_t microsPerHour = secsPerHour*microsPerSec;
+    static const micros_t microsPerDay = secsPerDay*microsPerSec;
+    static const micros_t microsPerYear = secsPerYear*microsPerSec;
+  private:
     micros_t microsTime = 0;
-
 };
 
 // DayTime provides a time of day for a single day, it's value can be in the range 0 to secsPerDay.  Useful for daily recurring alarms.
@@ -121,6 +122,7 @@ class Clock : public Time {
 
   protected:
     micros_t micros_offset = 0;
+    time_t last_sec = 0;
 
     bool doneSet = false;
     bool setting = false;

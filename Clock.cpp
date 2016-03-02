@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <Arduino.h>
-
 #include "Clock.h"
 
 void Time::setDateTime(uint16_t y, uint8_t m, uint8_t d, uint8_t hr, uint8_t min, uint8_t sec) {
@@ -97,33 +96,47 @@ void Time::shortDate(char* dateStr) {
   sprintf(dateStr, "%d-%02d-%02d", year(), month(), day());
 }
 
+void Time::setMicros(micros_t newTime) {
+  microsTime = newTime;
+}
+
+void Time::setSeconds(time_t newTime)  {
+  microsTime = newTime * microsPerSec;
+  // why does calling setMicros here crash on Teensy3?
+  setMicros( microsTime );
+  microsTime++;
+}
+
+void Time::setMillis(millis_t newTime) {
+  setMicros( ((millis_t)newTime) * microsPerMilli );
+}
+
 // Use separate rollover calculations for millis() and micros() for efficiency.
-// todo: Find a simpler solution and move the offsets into static class fields
+// todo: Find a simpler solution
+
+millis_t lastUptimeMillis = 0;
+millis_t uptimeOffsetMillis = 0;
+micros_t lastUptimeMicros = 0;
+micros_t uptimeOffsetMicros = 0;
 
 micros_t Uptime::micros() {
-  static micros_t lastUptime = 0;
-  static micros_t uptimeOffset = 0;
-
   micros_t nowUptime = ::micros();
-  if (nowUptime < lastUptime) {
+  if (nowUptime < lastUptimeMicros) {
     // micros have rolled over, we add a new offset
-    uptimeOffset += 0x0000000100000000;
+    uptimeOffsetMillis += 0x0000000100000000;
   }
-  lastUptime = nowUptime;
-  return nowUptime + uptimeOffset;
+  lastUptimeMicros = nowUptime;
+  return nowUptime + uptimeOffsetMicros;
 }
 
 millis_t Uptime::millis() {
-  static millis_t lastUptime = 0;
-  static millis_t uptimeOffset = 0;
-
   millis_t nowUptime = ::millis();
-  if (nowUptime < lastUptime) {
+  if (nowUptime < lastUptimeMillis) {
     // millis have rolled over, we add a new offset
-    uptimeOffset += 0x0000000100000000;
+    uptimeOffsetMillis += 0x0000000100000000;
   }
-  lastUptime = nowUptime;
-  return nowUptime + uptimeOffset;
+  lastUptimeMillis = nowUptime;
+  return nowUptime + uptimeOffsetMillis;
 }
 
 time_t DayTime::nextOccurance(time_t starting) {
@@ -136,14 +149,14 @@ time_t DayTime::nextOccurance(time_t starting) {
 
 // real time clock methods
 time_t Clock::getSeconds() {
-  static time_t last_sec = 0;
 
   time_t now_sec = ::now();
 
-  if (now_sec != last_sec) {
-    micros_offset = Uptime::micros();
-    last_sec = now_sec;
-  }
+// todo: this is wrong, calibration should happen at a finer scale than getSeconds()
+//  if (now_sec != last_sec) {
+//    micros_offset = Uptime::micros();
+//    last_sec = now_sec;
+//  }
 
   return now_sec;
 }
