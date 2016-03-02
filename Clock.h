@@ -1,7 +1,5 @@
 #ifndef _Clock_
 #define _Clock_
-#include <Debug.h>
-
 
 #include "TimeLib.h"
 
@@ -21,20 +19,24 @@ class Time {
   public:
     Time() {};
 
-    virtual time_t getSeconds() { return microsTime/microsPerSec; } // seconds since 1970-01-01
-    virtual millis_t getMillis() { return microsTime/microsPerMilli; }  // milliseconds since 1970-01-01
-    virtual micros_t getMicros() { return microsTime; }  // microseconds since 1970-01-01
-    virtual uint32_t fracMicros() { return microsTime%microsPerSec; } // microseconds since the last second expired
-    virtual uint16_t fracMillis() { return microsTime%microsPerMilli; } // microseconds since the last second expired
-
-    void setMicros(micros_t newTime);  // todo: making this virtual causes a crash!
-    void setMillis(millis_t newTime);
-    void setSeconds(time_t newTime);
-
-    virtual void setDateTime(uint16_t y, uint8_t m = 1, uint8_t d = 1, uint8_t hr = 0, uint8_t min = 0, uint8_t sec = 0);
-    void adjustSeconds(stime_t adjustment) { setSeconds(getSeconds() + adjustment); } // signed time
-    void adjustMillis(millis_t adjustment) {  setMillis(getMillis()+adjustment); }  // signed delta millis
+    virtual micros_t getMicros();// microseconds since 1970-01-01
+    virtual void setMicros(micros_t newTime);
     virtual void adjustMicros(micros_t adjustment) {  setMicros(getMicros()+adjustment); }  // signed delta micros
+
+    time_t getSeconds() { return getMicros()/microsPerSec; } // seconds since 1970-01-01
+    millis_t getMillis() { return getMicros()/microsPerMilli; }  // milliseconds since 1970-01-01
+    uint32_t fracMicros() { return getMicros()%microsPerSec; } // microseconds since the last second expired
+    uint16_t fracMillis() { return fracMicros()/microsPerMilli; } // microseconds since the last second expired
+
+    void setMillis(millis_t newTime) { setMicros(newTime * microsPerMilli); }
+    void setSeconds(time_t newTime) { setMicros(newTime * microsPerSec); }
+
+    // convenience for the old syntax
+    time_t now() { return getSeconds(); }
+
+    void setDateTime(uint16_t y, uint8_t m = 1, uint8_t d = 1, uint8_t hr = 0, uint8_t min = 0, uint8_t sec = 0);
+    void adjustSeconds(stime_t adjustment) { adjustMicros(microsPerSec * adjustment); } // signed time
+    void adjustMillis(millis_t adjustment) {  adjustMicros(millisPerSec * adjustment); }  // signed delta millis
 
     virtual bool isTime(time_t newTime) { return newTime == getSeconds(); }
 
@@ -92,29 +94,19 @@ class DayTime : public Time {
 // Uptime provides a Time that is tied to the micros() since the system started.  Easiest access is by Uptime::millis() or Uptime::micros()
 class Uptime : public Time {
   public:
-    static millis_t millis();
-    static micros_t micros();
-    time_t getSeconds() { return millis()/millisPerSec; }
     millis_t getMillis() { return millis(); }
     micros_t getMicros() { return micros(); }
+
+    static millis_t millis();
+    static micros_t micros();
 };
 
 // Clock provides a Time that progresses in real time, without a separate RTC, assumes the RTC only has second resolution
 class Clock : public Time {
 
   public:
-    Clock();
-
-    time_t getSeconds();
-    millis_t getMillis() { return getSeconds()*millisPerSec+fracMillis(); }
-    micros_t getMicros() { return getSeconds()*microsPerSec+fracMicros(); }
-    uint16_t fracMillis() { return fracMicros()/microsPerMilli; }  // fractional seconds in millis
-    uint32_t fracMicros();  // fractional seconds in micros
-
-    // convenience for the old syntax
-    time_t now() { return getSeconds(); }
-
-    void setMicros(micros_t newTime);
+    virtual micros_t getMicros();
+    virtual void setMicros(micros_t newTime);
 
     virtual bool hasBeenSet() { return doneSet && !setting; }
     virtual void beginSetTime() { setting = true;};
@@ -133,7 +125,7 @@ class Clock : public Time {
 class TeensyRTCClock : public Clock {
   public:
     TeensyRTCClock();
-    void setMicros(micros_t newTime);
+    virtual void setMicros(micros_t newTime);
 };
 #endif
 

@@ -2,6 +2,10 @@
 #include <Arduino.h>
 #include "Clock.h"
 
+micros_t Time::getMicros() {
+  return microsTime;
+}
+
 void Time::setDateTime(uint16_t y, uint8_t m, uint8_t d, uint8_t hr, uint8_t min, uint8_t sec) {
   TimeElements tmE;
   tmE.Year = y - 1970;
@@ -100,17 +104,6 @@ void Time::setMicros(micros_t newTime) {
   microsTime = newTime;
 }
 
-void Time::setSeconds(time_t newTime)  {
-  microsTime = newTime * microsPerSec;
-  // why does calling setMicros here crash on Teensy3?
-  setMicros( microsTime );
-  microsTime++;
-}
-
-void Time::setMillis(millis_t newTime) {
-  setMicros( ((millis_t)newTime) * microsPerMilli );
-}
-
 // Use separate rollover calculations for millis() and micros() for efficiency.
 // todo: Find a simpler solution
 
@@ -148,33 +141,25 @@ time_t DayTime::nextOccurance(time_t starting) {
 };
 
 // real time clock methods
-time_t Clock::getSeconds() {
-
-  time_t now_sec = ::now();
-
-// todo: this is wrong, calibration should happen at a finer scale than getSeconds()
-//  if (now_sec != last_sec) {
-//    micros_offset = Uptime::micros();
-//    last_sec = now_sec;
-//  }
-
-  return now_sec;
-}
-
 void Clock::setMicros(micros_t newTime) {
   ::setTime(newTime/microsPerSec);
-  micros_offset = Uptime::micros() - newTime%microsPerSec;
+  last_sec = 0;
   doneSet = true;
 }
 
-uint32_t Clock::fracMicros() {
-  getSeconds();
-  return Uptime::micros() - micros_offset;
-}
+micros_t Clock::getMicros() {
+  time_t now_sec = ::now();
 
-Clock::Clock() {
-}
+  // every time we check the clock, we check to see if we've rolled over to the next second
+  // in that case, we remember this time and use it to calculate an offset
+  // this will only be as accurate as the rate at which we check the time
+  if (now_sec != last_sec) {
+    micros_offset = Uptime::micros();
+    last_sec = now_sec;
+  }
 
+  return now_sec*microsPerSec + (Uptime::micros() - micros_offset);
+}
 
 #if defined(CORE_TEENSY)
 time_t getTeensyRTCTime()
