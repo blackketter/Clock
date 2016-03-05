@@ -116,7 +116,7 @@ micros_t Uptime::micros() {
   micros_t nowUptime = ::micros();
   if (nowUptime < lastUptimeMicros) {
     // micros have rolled over, we add a new offset
-    uptimeOffsetMillis += 0x0000000100000000;
+    uptimeOffsetMicros += 0x0000000100000000;
   }
   lastUptimeMicros = nowUptime;
   return nowUptime + uptimeOffsetMicros;

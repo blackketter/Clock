@@ -92,6 +92,7 @@ class DayTime : public Time {
 };
 
 // Uptime provides a Time that is tied to the micros() since the system started.  Easiest access is by Uptime::millis() or Uptime::micros()
+// Setting has no effect.
 class Uptime : public Time {
   public:
     millis_t getMillis() { return millis(); }
