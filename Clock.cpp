@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <Arduino.h>
 #include "Clock.h"
+#include "Debug.h"
 
 micros_t Time::getMicros() {
   return microsTime;
@@ -101,6 +102,7 @@ void Time::shortDate(char* dateStr) {
 }
 
 void Time::setMicros(micros_t newTime) {
+  DEBUGF("Time::setMicros\n");
   microsTime = newTime;
 }
 
@@ -142,7 +144,8 @@ time_t DayTime::nextOccurance(time_t starting) {
 
 // real time clock methods
 void Clock::setMicros(micros_t newTime) {
-  ::setTime(newTime/microsPerSec);
+    DEBUGF("TeensyRTCClock::setMicros\n");
+      ::setTime(newTime/microsPerSec);
   last_sec = 0;
   doneSet = true;
 }
@@ -165,7 +168,6 @@ micros_t Clock::getMicros() {
 time_t getTeensyRTCTime()
 {
   return Teensy3Clock.get();
-//  return 0;
 }
 
 TeensyRTCClock::TeensyRTCClock() {
@@ -181,8 +183,11 @@ TeensyRTCClock::TeensyRTCClock() {
 }
 
 void TeensyRTCClock::setMicros(micros_t newTime) {
-    Teensy3Clock.set(newTime/microsPerSec);
+    DEBUGF("TeensyRTCClock::setMicros\n");
+    time_t newSecs = newTime/microsPerSec;
+    Teensy3Clock.set(newSecs);
     Clock::setMicros(newTime);
+
     // force a resync
     setSyncProvider(getTeensyRTCTime);
     doneSet = true;
