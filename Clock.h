@@ -2,7 +2,6 @@
 #define _Clock_
 
 #include "TimeLib.h"
-#include "Debug.h"
 
 // signed time for relative time, deltas, adjustments, etc.
 typedef int32_t stime_t;
