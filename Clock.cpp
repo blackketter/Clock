@@ -158,7 +158,7 @@ micros_t Clock::getMicros() {
     last_sec = now_sec;
   }
 
-  return now_sec*microsPerSec + (Uptime::micros() - micros_offset);
+  return (now_sec+zone_offset)*microsPerSec + (Uptime::micros() - micros_offset);
 }
 
 #if defined(CORE_TEENSY)

@@ -115,9 +115,13 @@ class Clock : public Time {
     virtual void beginSetTime() { setting = true;};
     virtual void endSetTime() { setting = false; } ;
 
+    void setZoneOffset(stime_t offset) { zone_offset = offset; };
+    stime_t getZoneOffset(void) { return zone_offset; }
+
   protected:
     micros_t micros_offset = 0;
     time_t last_sec = 0;
+    stime_t zone_offset = 0;
 
     bool doneSet = false;
     bool setting = false;
