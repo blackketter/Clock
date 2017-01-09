@@ -1,9 +1,13 @@
 #ifndef _Clock_
 #define _Clock_
 
-#include "TimeLib.h"
+#include "inttypes.h"
 
-// signed time for relative time, deltas, adjustments, etc.
+#if !defined(__time_t_defined) // avoid conflict with newlib or other posix libc
+typedef long int time_t;
+#endif
+
+// signed time (in seconds) for relative time, deltas, adjustments, etc.
 typedef int32_t stime_t;
 
 // milliseconds are always expressed as 64-bit numbers, to avoid rollover
@@ -17,16 +21,23 @@ typedef int64_t micros_t;
 // Use Clock (or one of its descendents) for a real-time clock.
 // Use Uptime for a clock that keeps track of time since boot.
 class Time {
-
   public:
     Time() {};
+    Time(time_t t) { setSeconds(t); }
+    Time(micros_t t) { setMicros(t); }
+    Time(Time* t) { setMicros(t->getMicros()); }
 
     virtual micros_t getMicros();// microseconds since 1970-01-01
     virtual void setMicros(micros_t newTime);
     virtual void adjustMicros(micros_t adjustment) {    setMicros(getMicros()+adjustment); }  // signed delta micros
 
     time_t getSeconds() { return getMicros()/microsPerSec; } // seconds since 1970-01-01
+
+
     millis_t getMillis() { return getMicros()/microsPerMilli; }  // milliseconds since 1970-01-01
+    inline millis_t millis() { return getMillis(); } // alias
+    inline millis_t micros() { return getMicros(); } // alias
+
     uint32_t fracMicros() { return getMicros()%microsPerSec; } // microseconds since the last second expired
     uint16_t fracMillis() { return fracMicros()/microsPerMilli; } // microseconds since the last second expired
 
@@ -81,59 +92,111 @@ class Time {
     static const micros_t microsPerDay = secsPerDay*microsPerSec;
     static const micros_t microsPerYear = secsPerYear*microsPerSec;
   protected:
-    micros_t microsTime = 0;
+    micros_t _micros_time = 0;
 };
 
-// DayTime provides a time of day for a single day, it's value can be in the range 0 to secsPerDay.  Useful for daily recurring alarms.
+// DayTime provides a time of day for a single day, it's time_t value can be in the range 0 to secsPerDay.  Useful for daily recurring alarms.
 class DayTime : public Time {
   public:
-    virtual void setMicros(micros_t newTime) {  Time::setMicros(newTime % microsPerDay); }
-    virtual void adjustMicros(micros_t adjustment)  { if (adjustment < 0) { adjustment = microsPerDay-((-adjustment)%microsPerDay); } setMicros(adjustment+getMicros()); };
-    virtual bool isTime(time_t newTime) { return getSeconds() == (newTime % secsPerDay); }
+    virtual void setMicros(micros_t newTime) {  Time::setMicros(newTime % interval()); }
+    virtual void adjustMicros(micros_t adjustment)  { if (adjustment < 0) { adjustment = interval()-((-adjustment)%interval()); } setMicros(adjustment+getMicros()); };
+    virtual bool isTime(time_t newTime) { return getSeconds() == (newTime % (interval()/microsPerSec)); }
     virtual time_t nextOccurance(time_t starting);
+  protected:
+    virtual micros_t interval() { return microsPerDay; }
 };
 
-// Uptime provides a Time that is tied to the micros() since the system started.  Easiest access is by Uptime::millis() or Uptime::micros()
+// YearTime provides a time of day for a single year, it's time_t value can be in the range 0 to secsPerYear.  Useful for yearly events (birthdays, DST, etc...)
+class YearTime : public DayTime {
+  protected:
+    virtual micros_t interval() { return microsPerYear; }
+};
+
+
+// Uptime provides a Time that is tied to the micros() since the system started.  Easiest access is by Uptime::micros() or Uptime::millis()
 // Setting has no effect.
 class Uptime : public Time {
   public:
-    millis_t getMillis() { return millis(); }
+    static inline millis_t millis() { return micros()/microsPerMilli; }
+    static micros_t micros();
+    static time_t seconds() { return millis()/millisPerSec; }
+
     micros_t getMicros() { return micros(); }
 
-    static millis_t millis();
-    static micros_t micros();
+  private:
+    static micros_t lastUptimeMicros;
+    static micros_t uptimeOffsetMicros;
 };
 
-// Clock provides a Time that progresses in real time, without a separate RTC, assumes the RTC only has second resolution
-class Clock : public Time {
+class LocalTime : public Time {
+  // LocalTime's internal time is in the base (typically UTC) time, then the offset is applied to it
+  public:
+    LocalTime() {};
+    LocalTime(time_t t, stime_t offset) { setZoneOffset(offset); setSeconds(t); }  // constructor makes sure that offset is set first
+    LocalTime(micros_t t, stime_t offset) { setZoneOffset(offset); setMicros(t); }  // constructor makes sure that offset is set first
+
+    virtual micros_t getMicros() { return Time::getMicros() + _zone_offset; };
+    virtual void setMicros(micros_t newTime) { Time::setMicros(newTime - _zone_offset); };
+
+    void setZoneOffset(stime_t offset) { _zone_offset = microsPerSec * offset; }
+    inline stime_t getZoneOffset(void) { return _zone_offset / microsPerSec; }
+
+  protected:
+      micros_t _zone_offset = 0;
+};
+
+// BaseClock is an abstract class that provides a Time
+// that progresses in real time, without a separate RTC,
+// assumes the RTC only has second resolution
+//
+// use Clock for a real-time clock that may be backed by hardware RTC, when possible
+// note that the updating and offset calculations are static and therefore there
+// is only one set per system which precludes multiple RTC sources for now
+class BaseClock : public LocalTime {
 
   public:
     virtual micros_t getMicros();
     virtual void setMicros(micros_t newTime);
 
-    virtual bool hasBeenSet() { return doneSet && !setting; }
-    virtual void beginSetTime() { setting = true;};
-    virtual void endSetTime() { setting = false; } ;
+    virtual bool hasBeenSet();
+    virtual void beginSetTime() { _is_setting = true;}
+    virtual void endSetTime() { _is_setting = false; }
 
-    void setZoneOffset(stime_t offset) { zone_offset = offset; };
-    stime_t getZoneOffset(void) { return zone_offset; }
+    virtual void updateTime() = 0;
+    time_t lastUpdate() { return _last_update/microsPerSec; }
+
+    void setUpdateInterval(time_t i) { _update_interval = i * microsPerSec; }
+    time_t getUpdateInterval() { return _update_interval / microsPerSec; }
 
   protected:
-    micros_t micros_offset = 0;
-    time_t last_sec = 0;
-    stime_t zone_offset = 0;
-
-    bool doneSet = false;
-    bool setting = false;
+    static micros_t _micros_offset;
+    static bool _is_setting;
+    static micros_t _update_interval;
+    static micros_t _last_update;
 };
 
-#if defined(CORE_TEENSY)
-// TeensyRTCClock provides a Clock that is tied to the Teensy3 RTC. (Todo: Verify if this will work with the Teensy 2.0++)
-class TeensyRTCClock : public Clock {
+#if defined(TEENSY)
+
+// TeensyClock provides a Clock that is tied to the Teensy3 RTC
+class TeensyClock : public BaseClock {
   public:
-    TeensyRTCClock();
+    TeensyClock();
+    virtual void updateTime();
     virtual void setMicros(micros_t newTime);
 };
+
+// Clock is just a TeensyClock on Teensy
+class Clock : public TeensyClock {
+};
+
+#else
+
+// we have no RTC, therefore updateTime doesn't do anything
+class Clock : public BaseClock {
+  public:
+    virtual void updateTime() { };
+};
+
 #endif
 
 #endif

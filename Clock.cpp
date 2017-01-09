@@ -2,11 +2,181 @@
 #include <Arduino.h>
 #include "Clock.h"
 
+/////////////////////
+// From TimeLib:
+typedef struct  {
+  uint8_t Second;
+  uint8_t Minute;
+  uint8_t Hour;
+  uint8_t Wday;   // day of week, sunday is day 1
+  uint8_t Day;
+  uint8_t Month;
+  uint8_t Year;   // offset from 1970;
+} 	tmElements_t, TimeElements;
+
+static tmElements_t tm;          // a cache of time elements
+static time_t cacheTime;   // the time the cache was updated
+
+// leap year calulator expects year argument as years offset from 1970
+#define LEAP_YEAR(Y)     ( ((1970+Y)>0) && !((1970+Y)%4) && ( ((1970+Y)%100) || !((1970+Y)%400) ) )
+
+static  const uint8_t monthDays[]={31,28,31,30,31,30,31,31,30,31,30,31}; // API starts months from 1, this array starts from 0
+
+void breakTime(time_t timeInput, tmElements_t &tm){
+// break the given time_t into time components
+// this is a more compact version of the C library localtime function
+// note that year is offset from 1970 !!!
+
+  uint8_t year;
+  uint8_t month, monthLength;
+  uint32_t time;
+  unsigned long days;
+
+  time = (uint32_t)timeInput;
+  tm.Second = time % 60;
+  time /= 60; // now it is minutes
+  tm.Minute = time % 60;
+  time /= 60; // now it is hours
+  tm.Hour = time % 24;
+  time /= 24; // now it is days
+  tm.Wday = ((time + 4) % 7) + 1;  // Sunday is day 1
+
+  year = 0;
+  days = 0;
+  while((unsigned)(days += (LEAP_YEAR(year) ? 366 : 365)) <= time) {
+    year++;
+  }
+  tm.Year = year; // year is offset from 1970
+
+  days -= LEAP_YEAR(year) ? 366 : 365;
+  time  -= days; // now it is days in this year, starting at 0
+
+  days=0;
+  month=0;
+  monthLength=0;
+  for (month=0; month<12; month++) {
+    if (month==1) { // february
+      if (LEAP_YEAR(year)) {
+        monthLength=29;
+      } else {
+        monthLength=28;
+      }
+    } else {
+      monthLength = monthDays[month];
+    }
+
+    if (time >= monthLength) {
+      time -= monthLength;
+    } else {
+        break;
+    }
+  }
+  tm.Month = month + 1;  // jan is month 1
+  tm.Day = time + 1;     // day of month
+}
+
+time_t makeTime(tmElements_t &tm){
+// assemble time elements into time_t
+// note year argument is offset from 1970 (see macros in time.h to convert to other formats)
+// previous version used full four digit year (or digits since 2000),i.e. 2009 was 2009 or 9
+
+  int i;
+  uint32_t seconds;
+
+  // seconds from 1970 till 1 jan 00:00:00 of the given year
+  seconds= tm.Year*(Time::secsPerDay * 365);
+  for (i = 0; i < tm.Year; i++) {
+    if (LEAP_YEAR(i)) {
+      seconds +=  Time::secsPerDay;   // add extra days for leap years
+    }
+  }
+
+  // add days for this year, months start from 1
+  for (i = 1; i < tm.Month; i++) {
+    if ( (i == 2) && LEAP_YEAR(tm.Year)) {
+      seconds += Time::secsPerDay * 29;
+    } else {
+      seconds += Time::secsPerDay * monthDays[i-1];  //monthDay array starts from 0
+    }
+  }
+  seconds+= (tm.Day-1) * Time::secsPerDay;
+  seconds+= tm.Hour * Time::secsPerHour;
+  seconds+= tm.Minute * Time::secsPerMin;
+  seconds+= tm.Second;
+  return (time_t)seconds;
+}
+
+/*============================================================================*/
+/* functions to convert to and from system time */
+/* These are for interfacing with time serivces and are not normally needed in a sketch */
+void refreshCache(time_t t) {
+  if (t != cacheTime) {
+    breakTime(t, tm);
+    cacheTime = t;
+  }
+}
+
+int hour(time_t t) { // the hour for the given time
+  refreshCache(t);
+  return tm.Hour;
+}
+
+int hourFormat12(time_t t) { // the hour for the given time in 12 hour format
+  refreshCache(t);
+  if( tm.Hour == 0 )
+    return 12; // 12 midnight
+  else if( tm.Hour  > 12)
+    return tm.Hour - 12 ;
+  else
+    return tm.Hour ;
+}
+
+uint8_t isPM(time_t t) { // returns true if PM
+  return (hour(t) >= 12);
+}
+
+uint8_t isAM(time_t t) { // returns true if given time is AM
+  return !isPM(t);
+}
+
+int minute(time_t t) { // the minute for the given time
+  refreshCache(t);
+  return tm.Minute;
+}
+
+int second(time_t t) {  // the second for the given time
+  refreshCache(t);
+  return tm.Second;
+}
+
+int day(time_t t) { // the day for the given time (0-6)
+  refreshCache(t);
+  return tm.Day;
+}
+
+int weekday(time_t t) {
+  refreshCache(t);
+  return tm.Wday;
+}
+
+int month(time_t t) {  // the month for the given time
+  refreshCache(t);
+  return tm.Month;
+}
+
+int year(time_t t) { // the year for the given time
+  refreshCache(t);
+  return tm.Year + 1970;
+}
+
+
+///////////////////////////
 micros_t Time::getMicros() {
-  return microsTime;
+  return _micros_time;
 }
 
 void Time::setDateTime(uint16_t y, uint8_t m, uint8_t d, uint8_t hr, uint8_t min, uint8_t sec) {
+//todo: clean this up
   TimeElements tmE;
   tmE.Year = y - 1970;
   tmE.Month = m;
@@ -18,19 +188,25 @@ void Time::setDateTime(uint16_t y, uint8_t m, uint8_t d, uint8_t hr, uint8_t min
 }
 
 uint8_t Time::hourFormat12() {
-  return ::hourFormat12(getSeconds());
+  uint8_t h = getSeconds() % (secsPerDay/2) / secsPerHour;
+  if (h == 0) { h = 12; };
+  return h;
 }
 
 uint8_t Time::hour() {
-  return ::hour(getSeconds());
+  return getSeconds() % secsPerDay / secsPerHour;
+}
+
+bool Time::isAM() {
+    return hour() < 12;
 }
 
 uint8_t Time::minute() {
-  return ::minute(getSeconds());
+    return getSeconds() % secsPerHour / secsPerMin;
 }
 
 uint8_t Time::second() {
-  return ::second(getSeconds());
+  return getSeconds() % secsPerMin;
 }
 
 uint16_t Time::year() {
@@ -49,10 +225,6 @@ uint8_t Time::weekday() {
   return ::weekday(getSeconds());
 }
 
-bool Time::isAM() {
-  return ::isAM(getSeconds());
-}
-
 void Time::shortTime(char * timeStr) {
   sprintf(timeStr, "%d:%02d %s", hourFormat12(), minute(), isAM() ? "am":"pm");
 };
@@ -60,8 +232,6 @@ void Time::shortTime(char * timeStr) {
 void Time::longTime(char * timeStr) {
   sprintf(timeStr, "%d:%02d:%02d %s", hourFormat12(), minute(), second(), isAM() ? "am":"pm");
 };
-
-static const uint8_t monthDays[]={31,28,31,30,31,30,31,31,30,31,30,31}; // API starts months from 1, this array starts from 0
 
 // todo: internationalization & localization of names, reuse DateStrings.cpp if possible (the table is not exposed currently)
 static const char* dayStrings[] = { "", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
@@ -101,16 +271,14 @@ void Time::shortDate(char* dateStr) {
 }
 
 void Time::setMicros(micros_t newTime) {
-  microsTime = newTime;
+  _micros_time = newTime;
 }
 
-// Use separate rollover calculations for millis() and micros() for efficiency.
-// todo: Find a simpler solution
-
-millis_t lastUptimeMillis = 0;
-millis_t uptimeOffsetMillis = 0;
-micros_t lastUptimeMicros = 0;
-micros_t uptimeOffsetMicros = 0;
+//////////////////////////////////////////////////////////////////////////////
+// Uptime Methods
+//
+micros_t Uptime::lastUptimeMicros = 0;
+micros_t Uptime::uptimeOffsetMicros = 0;
 
 micros_t Uptime::micros() {
   micros_t nowUptime = ::micros();
@@ -122,71 +290,64 @@ micros_t Uptime::micros() {
   return nowUptime + uptimeOffsetMicros;
 }
 
-millis_t Uptime::millis() {
-  millis_t nowUptime = ::millis();
-  if (nowUptime < lastUptimeMillis) {
-    // millis have rolled over, we add a new offset
-    uptimeOffsetMillis += 0x0000000100000000;
-  }
-  lastUptimeMillis = nowUptime;
-  return nowUptime + uptimeOffsetMillis;
-}
-
+//////////////////////////////////////////////////////////////////////////////
+// DayTime Methods
+//
 time_t DayTime::nextOccurance(time_t starting) {
-  time_t nextup = (starting/secsPerDay)*secsPerDay + getSeconds();
+  time_t intervalSecs = interval()/microsPerSec;
+  time_t nextup = (starting/intervalSecs)*intervalSecs + getSeconds();
   if (nextup < starting) {
-    nextup+= secsPerDay;
+    nextup+= intervalSecs;
   }
   return nextup;
 };
 
-// real time clock methods
-void Clock::setMicros(micros_t newTime) {
-  ::setTime(newTime/microsPerSec);
-  last_sec = 0;
-  doneSet = true;
+//////////////////////////////////////////////////////////////////////////////
+// BaseClock Methods
+//
+
+micros_t BaseClock::_micros_offset = 0;
+bool BaseClock::_is_setting = false;
+micros_t BaseClock::_update_interval = 0;
+micros_t BaseClock::_last_update = 0;
+
+void BaseClock::setMicros(micros_t newTime) {
+  _micros_offset = Uptime::micros();
+  LocalTime::setMicros(newTime);
 }
 
-micros_t Clock::getMicros() {
-  time_t now_sec = ::now();
-
-  // every time we check the clock, we check to see if we've rolled over to the next second
-  // in that case, we remember this time and use it to calculate an offset
-  // this will only be as accurate as the rate at which we check the time
-  if (now_sec != last_sec) {
-    micros_offset = Uptime::micros();
-    last_sec = now_sec;
+micros_t BaseClock::getMicros() {
+  micros_t now = Uptime::micros();
+  if (_update_interval && (now - _last_update) > _update_interval) {
+    _last_update = now;
+    updateTime();
   }
 
-  return (now_sec+zone_offset)*microsPerSec + (Uptime::micros() - micros_offset);
+  return LocalTime::getMicros() + now - _micros_offset;
 }
 
+bool BaseClock::hasBeenSet() {
+  return (_micros_offset != 0) && !_is_setting;
+}
+
+//////////////////////////////////////////////////////////////////////////////
+//  TeensyClock Methods
+//
 #if defined(CORE_TEENSY)
-time_t getTeensyRTCTime()
-{
-  return Teensy3Clock.get();
+
+TeensyClock::TeensyClock() {
+  updateTime();
+  setUpdateInterval(10);
 }
 
-TeensyRTCClock::TeensyRTCClock() {
-  setSyncProvider(getTeensyRTCTime);
-  if (timeStatus()!= timeSet || year() < 2015) {
-    // set clock to a recent time - not needed if the RTC is set
-    // a recent time seems more friendly than 1970, though 1970 was a pretty friendly year.
-    // disabling this because it might just be dumb
-    //::setTime(16,20,0,1,1,2015);
-  } else {
-    doneSet = true;
-  }
+void TeensyClock::updateTime() {
+  setSeconds(Teensy3Clock.get());
 }
 
-void TeensyRTCClock::setMicros(micros_t newTime) {
-    time_t newSecs = newTime/microsPerSec;
-    Teensy3Clock.set(newSecs);
-    Clock::setMicros(newTime);
-
-    // force a resync
-    setSyncProvider(getTeensyRTCTime);
-    doneSet = true;
+void TeensyClock::setMicros(micros_t newTime) {
+  time_t newSecs = newTime/microsPerSec;
+  BaseClock::setMicros(newTime);
+  Teensy3Clock.set(newSecs);
+  _last_update = Uptime::micros();
 }
-
 #endif
