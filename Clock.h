@@ -149,9 +149,10 @@ class LocalTime : public Time {
 // that progresses in real time, without a separate RTC,
 // assumes the RTC only has second resolution
 //
-// use Clock for a real-time clock that may be backed by hardware RTC, when possible
-// note that the updating and offset calculations are static and therefore there
-// is only one set per system which precludes multiple RTC sources for now
+// use Clock for a real-time clock that may be backed by hardware RTC
+//
+// note that the UTC time is shared across all Clocks, which means that there is
+// only a single BaseClock (and therefore RTC) per system
 class BaseClock : public LocalTime {
 
   public:
@@ -173,6 +174,7 @@ class BaseClock : public LocalTime {
     static bool _is_setting;
     static micros_t _update_interval;
     static micros_t _last_update;
+    static micros_t _utc_micros_time;
 };
 
 #if defined(TEENSY)

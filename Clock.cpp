@@ -306,14 +306,15 @@ time_t DayTime::nextOccurance(time_t starting) {
 // BaseClock Methods
 //
 
-micros_t BaseClock::_micros_offset = 0;
-bool BaseClock::_is_setting = false;
 micros_t BaseClock::_update_interval = 0;
 micros_t BaseClock::_last_update = 0;
+micros_t BaseClock::_micros_offset = 0;
+micros_t BaseClock::_utc_micros_time = 0;
+bool BaseClock::_is_setting = false;
 
 void BaseClock::setMicros(micros_t newTime) {
   _micros_offset = Uptime::micros();
-  LocalTime::setMicros(newTime);
+  _utc_micros_time = newTime - + _zone_offset;
 }
 
 micros_t BaseClock::getMicros() {
@@ -323,7 +324,7 @@ micros_t BaseClock::getMicros() {
     updateTime();
   }
 
-  return LocalTime::getMicros() + now - _micros_offset;
+  return _utc_micros_time + now - _micros_offset + _zone_offset;
 }
 
 bool BaseClock::hasBeenSet() {
