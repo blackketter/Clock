@@ -320,21 +320,21 @@ time_t DayTime::nextOccurance(time_t starting) {
 };
 
 //////////////////////////////////////////////////////////////////////////////
-// BaseClock Methods
+// RTCClock Methods
 //
 
-micros_t BaseClock::_update_interval = 0;
-micros_t BaseClock::_last_update = 0;
-micros_t BaseClock::_micros_offset = 0;
-micros_t BaseClock::_utc_micros_time = 0;
-bool BaseClock::_is_setting = false;
+micros_t RTCClock::_update_interval = 0;
+micros_t RTCClock::_last_update = 0;
+micros_t RTCClock::_micros_offset = 0;
+micros_t RTCClock::_utc_micros_time = 0;
+bool RTCClock::_is_setting = false;
 
-void BaseClock::setMicros(micros_t newTime) {
+void RTCClock::setMicros(micros_t newTime) {
   _micros_offset = Uptime::micros();
   _utc_micros_time = newTime - + _zone_offset;
 }
 
-micros_t BaseClock::getMicros() {
+micros_t RTCClock::getMicros() {
   micros_t now = Uptime::micros();
   if (_update_interval && (now - _last_update) > _update_interval) {
     _last_update = now;
@@ -344,12 +344,12 @@ micros_t BaseClock::getMicros() {
   return _utc_micros_time + now - _micros_offset + _zone_offset;
 }
 
-bool BaseClock::hasBeenSet() {
+bool RTCClock::hasBeenSet() {
   return (_micros_offset != 0) && !_is_setting;
 }
 
 //////////////////////////////////////////////////////////////////////////////
-//  TeensyClock Methods
+//  Teensy Clock Methods
 //
 #if defined(CORE_TEENSY)
 
@@ -359,13 +359,53 @@ TeensyClock::TeensyClock() {
 }
 
 void TeensyClock::updateTime() {
-  setSeconds(Teensy3Clock.get());
+  RTCClock::setMicros(getRTCMicros());
+  _last_update = Uptime::micros();
 }
 
 void TeensyClock::setMicros(micros_t newTime) {
-  time_t newSecs = newTime/microsPerSec;
-  BaseClock::setMicros(newTime);
-  Teensy3Clock.set(newSecs);
+  RTCClock::setMicros(newTime);
+
+  setRTCMicros(newTime);
+
   _last_update = Uptime::micros();
 }
-#endif
+
+millis_t TeensyClock::getRTCMicros() {
+  uint32_t read1, read2, secs, us = 0;
+    do {
+      read1 = RTC_TSR;
+      read2 = RTC_TSR;
+    } while (read1 != read2);       //insure the same read twice to avoid 'glitches'
+  
+    secs = read1;
+
+    do {
+      read1 = RTC_TPR;
+      read2 = RTC_TPR;
+    } while (read1 != read2);       //insure the same read twice to avoid 'glitches'
+  
+    //Scale 32.768KHz to microseconds
+    us = ((micros_t)read1 * microsPerSec) / 32768;
+
+    //if prescaler just rolled over from zero, might have just incremented seconds -- refetch
+    if (us < 1000) {
+      do {
+        read1 = RTC_TSR;
+        read2 = RTC_TSR;
+      } while (read1 != read2);       //insure the same read twice to avoid 'glitches'
+      secs = read1;
+    }
+
+  return(secs*microsPerSec + us);
+}
+
+void TeensyClock::setRTCMicros(micros_t newTime) {
+
+  uint32_t secs = newTime / microsPerSec;
+  uint32_t tics = ((newTime % microsPerSec) * 32768) / (1000000); // a teensy tic is 1/32768
+  RTC_TSR = secs;
+  RTC_TPR = tics;
+}
+
+#endif // defined(CORE_TEENSY)

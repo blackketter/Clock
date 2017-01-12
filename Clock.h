@@ -32,15 +32,14 @@ class Time {
     virtual void setMicros(micros_t newTime);
     virtual void adjustMicros(micros_t adjustment) {    setMicros(getMicros()+adjustment); }  // signed delta micros
 
-    time_t getSeconds() { return getMicros()/microsPerSec; } // seconds since 1970-01-01
+    inline time_t getSeconds() { return getMicros()/microsPerSec; } // seconds since 1970-01-01
+    inline millis_t getMillis() { return getMicros()/microsPerMilli; }  // milliseconds since 1970-01-01
 
-
-    millis_t getMillis() { return getMicros()/microsPerMilli; }  // milliseconds since 1970-01-01
     inline millis_t millis() { return getMillis(); } // alias
     inline millis_t micros() { return getMicros(); } // alias
 
     uint32_t fracMicros() { return getMicros()%microsPerSec; } // microseconds since the last second expired
-    uint16_t fracMillis() { return fracMicros()/microsPerMilli; } // microseconds since the last second expired
+    uint16_t fracMillis() { return getMillis()%millisPerSec; } // milliseconds since the last second expired
 
     virtual void setMillis(millis_t newTime) { setMicros(newTime * microsPerMilli); }
     virtual void setSeconds(time_t newTime) { setMicros(newTime * microsPerSec); }
@@ -151,15 +150,15 @@ class LocalTime : public Time {
       micros_t _zone_offset = 0;
 };
 
-// BaseClock is an abstract class that provides a Time
-// that progresses in real time, without a separate RTC,
-// assumes the RTC only has second resolution
+// RTCClock is an abstract class that provides a Time
+// that progresses in real time, for use with an RTC
 //
-// use Clock for a real-time clock that may be backed by hardware RTC
+// Clock should be a platform-specific RTC-backed clock, derived from this class, when available.
 //
-// note that the UTC time is shared across all Clocks, which means that there is
-// only a single BaseClock (and therefore RTC) per system
-class BaseClock : public LocalTime {
+// note that the UTC time is shared across all Clocks, which means that there should be only
+// one RTC per system (for now)
+
+class RTCClock : public LocalTime {
 
   public:
     virtual micros_t getMicros();
@@ -184,27 +183,26 @@ class BaseClock : public LocalTime {
 };
 
 #if defined(TEENSY)
-
-// TeensyClock provides a Clock that is tied to the Teensy3 RTC
-class TeensyClock : public BaseClock {
+// On Teensy, the Clock is tied to the Teensy3 RTC
+class TeensyClock : public RTCClock {
   public:
     TeensyClock();
     virtual void updateTime();
     virtual void setMicros(micros_t newTime);
+
+    micros_t getRTCMicros();
+    void setRTCMicros(micros_t newTime);
 };
 
-// Clock is just a TeensyClock on Teensy
 class Clock : public TeensyClock {
 };
 
 #else
-
 // we have no RTC, therefore updateTime doesn't do anything
-class Clock : public BaseClock {
+class Clock : public RTCClock {
   public:
     virtual void updateTime() { };
 };
-
 #endif
 
 #endif
