@@ -2,6 +2,7 @@
 #define _Clock_
 
 #include "inttypes.h"
+#include "Print.h"
 
 #if !defined(__time_t_defined) // avoid conflict with newlib or other posix libc
 typedef long int time_t;
@@ -60,6 +61,11 @@ class Time {
     void longTime(char* timeStr);
     void longDate(char* dateStr);
     void shortDate(char* dateStr);
+
+    void shortTime(Print& p);
+    void shortDate(Print& p);
+    void longTime(Print& p);
+    void longDate(Print& p);
 
     bool isAM();
     uint8_t hourFormat12();

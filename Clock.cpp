@@ -175,6 +175,10 @@ micros_t Time::getMicros() {
   return _micros_time;
 }
 
+void Time::setMicros(micros_t newTime) {
+  _micros_time = newTime;
+}
+
 void Time::setDateTime(uint16_t y, uint8_t m, uint8_t d, uint8_t hr, uint8_t min, uint8_t sec) {
 //todo: clean this up
   TimeElements tmE;
@@ -225,14 +229,6 @@ uint8_t Time::weekday() {
   return ::weekday(getSeconds());
 }
 
-void Time::shortTime(char * timeStr) {
-  sprintf(timeStr, "%d:%02d %s", hourFormat12(), minute(), isAM() ? "am":"pm");
-};
-
-void Time::longTime(char * timeStr) {
-  sprintf(timeStr, "%d:%02d:%02d %s", hourFormat12(), minute(), second(), isAM() ? "am":"pm");
-};
-
 // todo: internationalization & localization of names, reuse DateStrings.cpp if possible (the table is not exposed currently)
 static const char* dayStrings[] = { "", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
 static const char* monthStrings[] = { "", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December" };
@@ -270,9 +266,30 @@ void Time::shortDate(char* dateStr) {
   sprintf(dateStr, "%d-%02d-%02d", year(), month(), day());
 }
 
-void Time::setMicros(micros_t newTime) {
-  _micros_time = newTime;
+void Time::shortTime(char * timeStr) {
+  sprintf(timeStr, "%d:%02d %s", hourFormat12(), minute(), isAM() ? "am":"pm");
+};
+
+void Time::longTime(char * timeStr) {
+  sprintf(timeStr, "%d:%02d:%02d %s", hourFormat12(), minute(), second(), isAM() ? "am":"pm");
+};
+
+void Time::longDate(Print& p) {
+  p.printf("%s, %s %d, %d", dayStrings[weekday()], monthStrings[month()], day(), year());
 }
+
+void Time::shortDate(Print& p) {
+  p.printf("%d-%02d-%02d", year(), month(), day());
+}
+
+void Time::shortTime(Print& p) {
+  p.printf("%d:%02d %s", hourFormat12(), minute(), isAM() ? "am":"pm");
+};
+
+void Time::longTime(Print& p) {
+  p.printf("%d:%02d:%02d %s", hourFormat12(), minute(), second(), isAM() ? "am":"pm");
+};
+
 
 //////////////////////////////////////////////////////////////////////////////
 // Uptime Methods
