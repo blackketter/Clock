@@ -404,8 +404,11 @@ void TeensyClock::setRTCMicros(micros_t newTime) {
 
   uint32_t secs = newTime / microsPerSec;
   uint32_t tics = ((newTime % microsPerSec) * 32768) / (1000000); // a teensy tic is 1/32768
-  RTC_TSR = secs;
+  
+  RTC_SR = 0;
   RTC_TPR = tics;
+  RTC_TSR = secs;
+  RTC_SR = RTC_SR_TCE;
 }
 
 #endif // defined(CORE_TEENSY)
