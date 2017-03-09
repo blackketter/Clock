@@ -3,6 +3,7 @@
 
 #include "inttypes.h"
 #include "Print.h"
+#include "Timezone.h"
 
 #if !defined(__time_t_defined) // avoid conflict with newlib or other posix libc
 typedef long int time_t;
@@ -122,8 +123,8 @@ class YearTime : public DayTime {
 // Setting has no effect.
 class Uptime : public Time {
   public:
-    static inline millis_t millis() { return micros()/microsPerMilli; }
     static micros_t micros();
+    static inline millis_t millis() { return micros()/microsPerMilli; }
     static time_t seconds() { return millis()/millisPerSec; }
 
     micros_t getMicros() { return micros(); }
@@ -137,17 +138,25 @@ class LocalTime : public Time {
   // LocalTime's internal time is in the base (typically UTC) time, then the offset is applied to it
   public:
     LocalTime() {};
-    LocalTime(time_t t, stime_t offset) { setZoneOffset(offset); setSeconds(t); }  // constructor makes sure that offset is set first
-    LocalTime(micros_t t, stime_t offset) { setZoneOffset(offset); setMicros(t); }  // constructor makes sure that offset is set first
+    LocalTime(time_t t, Timezone* zone) { setZone(zone); setSeconds(t); }  // constructor makes sure that offset is set first
+    LocalTime(micros_t t, Timezone* zone) { setZone(zone); setMicros(t); }  // constructor makes sure that offset is set first
 
-    virtual micros_t getMicros() { return Time::getMicros() + _zone_offset; };
-    virtual void setMicros(micros_t newTime) { Time::setMicros(newTime - _zone_offset); };
+    virtual micros_t getMicros() { return Time::getMicros() + getZoneOffset(); };
+    virtual void setMicros(micros_t newTime) {
+      micros_t off = 0;
+      if (_zone) {
+        time_t newSecs = newTime / microsPerSec;
+        off = microsPerSec * _zone->offset(_zone->toUTC(newSecs));
+      }
+      Time::setMicros(newTime - off);
+    };
 
-    void setZoneOffset(stime_t offset) { _zone_offset = microsPerSec * offset; }
-    inline stime_t getZoneOffset(void) { return _zone_offset / microsPerSec; }
+    void setZone(Timezone* zone) { _zone = zone; }
+    inline Timezone* getZone(void) { return _zone; }
 
+    stime_t getZoneOffset() { return _zone ? _zone->offset(getSeconds()) : 0; }
   protected:
-      micros_t _zone_offset = 0;
+      Timezone* _zone = nullptr;
 };
 
 // RTCClock is an abstract class that provides a Time

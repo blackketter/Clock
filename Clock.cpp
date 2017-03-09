@@ -1,173 +1,9 @@
 #include <stdio.h>
 #include <Arduino.h>
 #include "Clock.h"
-
-/////////////////////
-// From TimeLib:
-typedef struct  {
-  uint8_t Second;
-  uint8_t Minute;
-  uint8_t Hour;
-  uint8_t Wday;   // day of week, sunday is day 1
-  uint8_t Day;
-  uint8_t Month;
-  uint8_t Year;   // offset from 1970;
-} 	tmElements_t, TimeElements;
-
-static tmElements_t tm;          // a cache of time elements
-static time_t cacheTime;   // the time the cache was updated
-
-// leap year calulator expects year argument as years offset from 1970
-#define LEAP_YEAR(Y)     ( ((1970+Y)>0) && !((1970+Y)%4) && ( ((1970+Y)%100) || !((1970+Y)%400) ) )
+#include "Time.h"
 
 static  const uint8_t monthDays[]={31,28,31,30,31,30,31,31,30,31,30,31}; // API starts months from 1, this array starts from 0
-
-void breakTime(time_t timeInput, tmElements_t &tm){
-// break the given time_t into time components
-// this is a more compact version of the C library localtime function
-// note that year is offset from 1970 !!!
-
-  uint8_t year;
-  uint8_t month, monthLength;
-  uint32_t time;
-  unsigned long days;
-
-  time = (uint32_t)timeInput;
-  tm.Second = time % 60;
-  time /= 60; // now it is minutes
-  tm.Minute = time % 60;
-  time /= 60; // now it is hours
-  tm.Hour = time % 24;
-  time /= 24; // now it is days
-  tm.Wday = ((time + 4) % 7) + 1;  // Sunday is day 1
-
-  year = 0;
-  days = 0;
-  while((unsigned)(days += (LEAP_YEAR(year) ? 366 : 365)) <= time) {
-    year++;
-  }
-  tm.Year = year; // year is offset from 1970
-
-  days -= LEAP_YEAR(year) ? 366 : 365;
-  time  -= days; // now it is days in this year, starting at 0
-
-  days=0;
-  month=0;
-  monthLength=0;
-  for (month=0; month<12; month++) {
-    if (month==1) { // february
-      if (LEAP_YEAR(year)) {
-        monthLength=29;
-      } else {
-        monthLength=28;
-      }
-    } else {
-      monthLength = monthDays[month];
-    }
-
-    if (time >= monthLength) {
-      time -= monthLength;
-    } else {
-        break;
-    }
-  }
-  tm.Month = month + 1;  // jan is month 1
-  tm.Day = time + 1;     // day of month
-}
-
-time_t makeTime(tmElements_t &tm){
-// assemble time elements into time_t
-// note year argument is offset from 1970 (see macros in time.h to convert to other formats)
-// previous version used full four digit year (or digits since 2000),i.e. 2009 was 2009 or 9
-
-  int i;
-  uint32_t seconds;
-
-  // seconds from 1970 till 1 jan 00:00:00 of the given year
-  seconds= tm.Year*(Time::secsPerDay * 365);
-  for (i = 0; i < tm.Year; i++) {
-    if (LEAP_YEAR(i)) {
-      seconds +=  Time::secsPerDay;   // add extra days for leap years
-    }
-  }
-
-  // add days for this year, months start from 1
-  for (i = 1; i < tm.Month; i++) {
-    if ( (i == 2) && LEAP_YEAR(tm.Year)) {
-      seconds += Time::secsPerDay * 29;
-    } else {
-      seconds += Time::secsPerDay * monthDays[i-1];  //monthDay array starts from 0
-    }
-  }
-  seconds+= (tm.Day-1) * Time::secsPerDay;
-  seconds+= tm.Hour * Time::secsPerHour;
-  seconds+= tm.Minute * Time::secsPerMin;
-  seconds+= tm.Second;
-  return (time_t)seconds;
-}
-
-/*============================================================================*/
-/* functions to convert to and from system time */
-/* These are for interfacing with time serivces and are not normally needed in a sketch */
-void refreshCache(time_t t) {
-  if (t != cacheTime) {
-    breakTime(t, tm);
-    cacheTime = t;
-  }
-}
-
-int hour(time_t t) { // the hour for the given time
-  refreshCache(t);
-  return tm.Hour;
-}
-
-int hourFormat12(time_t t) { // the hour for the given time in 12 hour format
-  refreshCache(t);
-  if( tm.Hour == 0 )
-    return 12; // 12 midnight
-  else if( tm.Hour  > 12)
-    return tm.Hour - 12 ;
-  else
-    return tm.Hour ;
-}
-
-uint8_t isPM(time_t t) { // returns true if PM
-  return (hour(t) >= 12);
-}
-
-uint8_t isAM(time_t t) { // returns true if given time is AM
-  return !isPM(t);
-}
-
-int minute(time_t t) { // the minute for the given time
-  refreshCache(t);
-  return tm.Minute;
-}
-
-int second(time_t t) {  // the second for the given time
-  refreshCache(t);
-  return tm.Second;
-}
-
-int day(time_t t) { // the day for the given time (0-6)
-  refreshCache(t);
-  return tm.Day;
-}
-
-int weekday(time_t t) {
-  refreshCache(t);
-  return tm.Wday;
-}
-
-int month(time_t t) {  // the month for the given time
-  refreshCache(t);
-  return tm.Month;
-}
-
-int year(time_t t) { // the year for the given time
-  refreshCache(t);
-  return tm.Year + 1970;
-}
 
 
 ///////////////////////////
@@ -331,17 +167,29 @@ bool RTCClock::_is_setting = false;
 
 void RTCClock::setMicros(micros_t newTime) {
   _micros_offset = Uptime::micros();
-  _utc_micros_time = newTime - + _zone_offset;
+  micros_t zone_offset = 0;
+  if (_zone) {
+    zone_offset = microsPerSec * _zone->offset(_zone->toUTC(newTime/microsPerSec));
+  }
+  _utc_micros_time = newTime - zone_offset;
 }
 
 micros_t RTCClock::getMicros() {
-  micros_t now = Uptime::micros();
-  if (_update_interval && (now - _last_update) > _update_interval) {
-    _last_update = now;
+
+  micros_t up = Uptime::micros();
+  if (_update_interval && (up - _last_update) > _update_interval) {
+    _last_update = up;
     updateTime();
   }
 
-  return _utc_micros_time + now - _micros_offset + _zone_offset;
+  micros_t zone_offset = 0;
+  micros_t utc_now = _utc_micros_time + up - _micros_offset;
+
+  if (_zone) {
+    zone_offset = microsPerSec * _zone->offset(utc_now/microsPerSec);
+  }
+
+  return utc_now + zone_offset;
 }
 
 bool RTCClock::hasBeenSet() {
@@ -377,14 +225,14 @@ millis_t TeensyClock::getRTCMicros() {
       read1 = RTC_TSR;
       read2 = RTC_TSR;
     } while (read1 != read2);       //insure the same read twice to avoid 'glitches'
-  
+
     secs = read1;
 
     do {
       read1 = RTC_TPR;
       read2 = RTC_TPR;
     } while (read1 != read2);       //insure the same read twice to avoid 'glitches'
-  
+
     //Scale 32.768KHz to microseconds
     us = ((micros_t)read1 * microsPerSec) / 32768;
 
@@ -404,7 +252,7 @@ void TeensyClock::setRTCMicros(micros_t newTime) {
 
   uint32_t secs = newTime / microsPerSec;
   uint32_t tics = ((newTime % microsPerSec) * 32768) / (1000000); // a teensy tic is 1/32768
-  
+
   RTC_SR = 0;
   RTC_TPR = tics;
   RTC_TSR = secs;
