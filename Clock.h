@@ -125,7 +125,7 @@ class Uptime : public Time {
   public:
     static micros_t micros();
     static inline millis_t millis() { return micros()/microsPerMilli; }
-    static time_t seconds() { return millis()/millisPerSec; }
+    static inline time_t seconds() { return millis()/millisPerSec; }
 
     micros_t getMicros() { return micros(); }
 

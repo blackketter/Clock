@@ -193,7 +193,7 @@ micros_t RTCClock::getMicros() {
 }
 
 bool RTCClock::hasBeenSet() {
-  return (_micros_offset != 0) && !_is_setting;
+  return (_micros_offset != 0) && !_is_setting && (year() > 2016);
 }
 
 //////////////////////////////////////////////////////////////////////////////
