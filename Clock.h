@@ -155,6 +155,8 @@ class LocalTime : public Time {
     inline Timezone* getZone(void) { return _zone; }
 
     stime_t getZoneOffset() { return _zone ? _zone->offset(getSeconds()) : 0; }
+    TimeChangeRule* getZoneRule() { return _zone ? _zone->rule(getSeconds()) : nullptr; }
+
   protected:
       Timezone* _zone = nullptr;
 };
