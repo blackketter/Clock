@@ -198,6 +198,7 @@ class RTCClock : public LocalTime {
 class TeensyClock : public RTCClock {
   public:
     TeensyClock();
+    TeensyClock(Timezone* zone) { setZone(zone); }
     virtual void updateTime();
     virtual void setMicros(micros_t newTime);
 
@@ -212,6 +213,8 @@ class Clock : public TeensyClock {
 // we have no RTC, therefore updateTime doesn't do anything
 class Clock : public RTCClock {
   public:
+    Clock(Timezone* zone) { setZone(zone); }
+    Clock() {};
     virtual void updateTime() { };
 };
 #endif
