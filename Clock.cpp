@@ -207,16 +207,28 @@ TeensyClock::TeensyClock() {
 }
 
 void TeensyClock::updateTime() {
-  RTCClock::setMicros(getRTCMicros());
   _last_update = Uptime::micros();
+  Timezone* savedZone = _zone;
+  _zone = nullptr;
+
+  RTCClock::setMicros(getRTCMicros());
+
+  _zone = savedZone;
+
 }
 
 void TeensyClock::setMicros(micros_t newTime) {
+  _last_update = Uptime::micros();
+
   RTCClock::setMicros(newTime);
 
-  setRTCMicros(newTime);
+  Timezone* savedZone = _zone;
+  _zone = nullptr;
 
-  _last_update = Uptime::micros();
+  setRTCMicros(getMicros());
+
+  _zone = savedZone;
+
 }
 
 millis_t TeensyClock::getRTCMicros() {
