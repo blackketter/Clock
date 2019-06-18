@@ -81,12 +81,14 @@ class Time {
     uint8_t daysInMonth(uint8_t m = 0);  // zero means current month, months are 1 based
 
     static const time_t secsPerMin = 60L;
+    static const time_t secsPerMinute = secsPerMin;
     static const time_t secsPerHour = 60L*60;
     static const time_t secsPerDay = 60L*60*24;
     static const time_t secsPerYear = 60L*60*24*365;  // approximately
 
     static const millis_t millisPerSec = 1000;
     static const millis_t millisPerMin = secsPerMin*millisPerSec;
+    static const millis_t millisPerMinute = millisPerMin;
     static const millis_t millisPerHour = secsPerHour*millisPerSec;
     static const millis_t millisPerDay = secsPerDay*millisPerSec;
     static const millis_t millisPerYear = secsPerYear*millisPerSec;
@@ -94,6 +96,7 @@ class Time {
     static const micros_t microsPerMilli = 1000;
     static const micros_t microsPerSec = 1000000;
     static const micros_t microsPerMin = secsPerMin*microsPerSec;
+    static const micros_t microsPerMinute = microsPerMin;
     static const micros_t microsPerHour = secsPerHour*microsPerSec;
     static const micros_t microsPerDay = secsPerDay*microsPerSec;
     static const micros_t microsPerYear = secsPerYear*microsPerSec;
@@ -126,6 +129,8 @@ class Uptime : public Time {
     static micros_t micros();
     static inline millis_t millis() { return micros()/microsPerMilli; }
     static inline time_t seconds() { return millis()/millisPerSec; }
+    static void longTime(Print& p);
+
 
     micros_t getMicros() { return micros(); }
 

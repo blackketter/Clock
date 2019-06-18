@@ -143,6 +143,20 @@ micros_t Uptime::micros() {
   return nowUptime + uptimeOffsetMicros;
 }
 
+void Uptime::longTime(Print& p) {
+  time_t s = seconds();
+  int t = s/secsPerDay;
+  if (t) p.printf( "%d days, ", t);
+
+  t = (s%secsPerDay)/secsPerHour;
+  if (t) p.printf( "%d hours, ", t);
+
+  t = (s%secsPerHour)/secsPerMinute;
+  if (t) p.printf( "%d minutes, ", t);
+
+  t = s%secsPerMinute;
+  p.printf("%d seconds", t);
+}
 //////////////////////////////////////////////////////////////////////////////
 // DayTime Methods
 //
