@@ -2,7 +2,6 @@
 #define _Timer_
 
 #include "Arduino.h"
-#include "Types.h"
 #include "Clock.h"
 
 class Timer {

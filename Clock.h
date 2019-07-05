@@ -6,8 +6,9 @@
 #include "Timezone.h"
 
 #if !defined(__time_t_defined) // avoid conflict with newlib or other posix libc
-typedef long int time_t;
+typedef uint32_t time_t;
 #endif
+// note that on some platforms time_t is predefined to be 64 bits in length
 
 // signed time (in seconds) for relative time, deltas, adjustments, etc.
 typedef int32_t stime_t;
@@ -18,15 +19,13 @@ typedef int64_t millis_t;
 // microseconds are always expressed as 64-bit numbers, to avoid rollover
 typedef int64_t micros_t;
 
-// Time is a base class that represents a time and provides utility functions for getting information about that time
+// Time is a base class that represents a point in time and provides utility functions for getting information about that time
 // Time does not change unless you set() it.
 // Use Clock (or one of its descendents) for a real-time clock.
 // Use Uptime for a clock that keeps track of time since boot.
 class Time {
   public:
     Time() {};
-    Time(time_t t) { setSeconds(t); }
-    Time(micros_t t) { setMicros(t); }
     Time(Time* t) { setMicros(t->getMicros()); }
 
     virtual micros_t getMicros();// microseconds since 1970-01-01
