@@ -25,8 +25,6 @@ typedef int64_t micros_t;
 class Time {
   public:
     Time() {};
-    Time(time_t t) { setSeconds(t); }
-    Time(micros_t t) { setMicros(t); }
     Time(Time* t) { setMicros(t->getMicros()); }
 
     virtual micros_t getMicros();// microseconds since 1970-01-01
