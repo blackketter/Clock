@@ -244,8 +244,17 @@ void TeensyClock::setMicros(micros_t newTime) {
   _zone = savedZone;
 
 }
+#if defined(TEENSY40)
+micros_t TeensyClock::getRTCMicros() {
+  return (Teensy3Clock.get() * microsPerSec);
+}
 
-millis_t TeensyClock::getRTCMicros() {
+void TeensyClock::setRTCMicros(micros_t newTime) {
+  Teensy3Clock.set( newTime / microsPerSec );
+}
+
+#else
+micros_t TeensyClock::getRTCMicros() {
   uint32_t read1, read2, secs, us = 0;
     do {
       read1 = RTC_TSR;
@@ -284,5 +293,7 @@ void TeensyClock::setRTCMicros(micros_t newTime) {
   RTC_TSR = secs;
   RTC_SR = RTC_SR_TCE;
 }
+
+#endif
 
 #endif // defined(CORE_TEENSY)

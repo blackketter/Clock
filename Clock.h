@@ -197,7 +197,7 @@ class RTCClock : public LocalTime {
     static micros_t _utc_micros_time;
 };
 
-#if defined(TEENSY)
+#if defined(CORE_TEENSY)
 // On Teensy, the Clock is tied to the Teensy3 RTC
 class TeensyClock : public RTCClock {
   public:
