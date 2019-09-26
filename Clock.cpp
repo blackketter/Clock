@@ -241,16 +241,47 @@ void TeensyClock::setMicros(micros_t newTime) {
 
   setRTCMicros(getMicros());
 
+
   _zone = savedZone;
 
 }
 #if defined(TEENSY40)
+
 micros_t TeensyClock::getRTCMicros() {
-  return (Teensy3Clock.get() * microsPerSec);
+  uint32_t hi1 = SNVS_HPRTCMR;
+  uint32_t lo1 = SNVS_HPRTCLR;
+  while (1) {
+    uint32_t hi2 = SNVS_HPRTCMR;
+    uint32_t lo2 = SNVS_HPRTCLR;
+    if (lo1 == lo2 && hi1 == hi2) {
+
+      micros_t tics = ((micros_t)(hi2 & 0x7fff) << 32) + lo2;  // this is in tics
+
+      micros_t time = ((tics / 32768 ) * microsPerSec) + (((tics & 0x7fff) * microsPerSec) / 32768);
+
+      return time;
+    }
+    hi1 = hi2;
+    lo1 = lo2;
+  }
 }
 
+
 void TeensyClock::setRTCMicros(micros_t newTime) {
-  Teensy3Clock.set( newTime / microsPerSec );
+
+  micros_t tics = (newTime / microsPerSec) * 32768;
+  tics += ((newTime % microsPerSec) * 32768) / microsPerSec;
+  uint32_t lo = (uint32_t)(tics & 0xffffffff);
+  uint32_t hi = (uint32_t)(tics >> 32) & 0x7fff;
+
+  SNVS_HPCR &= ~SNVS_HPCR_RTC_EN;
+  while (SNVS_HPCR & SNVS_HPCR_RTC_EN) ; // wait
+
+  SNVS_HPRTCMR = hi;
+
+  SNVS_HPRTCLR = lo;
+
+  SNVS_HPCR |= SNVS_HPCR_RTC_EN;
 }
 
 #else
