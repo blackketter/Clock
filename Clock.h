@@ -5,6 +5,7 @@
 #include "Print.h"
 #include "Timezone.h"
 
+
 #if !defined(__time_t_defined) // avoid conflict with newlib or other posix libc
 typedef uint32_t time_t;
 #endif
@@ -222,5 +223,8 @@ class Clock : public RTCClock {
     virtual void updateTime() { };
 };
 #endif
+
+// Provide a system clock object
+extern Clock clock;
 
 #endif

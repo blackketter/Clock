@@ -5,6 +5,7 @@
 
 static  const uint8_t monthDays[]={31,28,31,30,31,30,31,31,30,31,30,31}; // API starts months from 1, this array starts from 0
 
+Clock clock;
 
 ///////////////////////////
 micros_t Time::getMicros() {
