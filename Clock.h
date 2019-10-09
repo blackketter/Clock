@@ -224,7 +224,4 @@ class Clock : public RTCClock {
 };
 #endif
 
-// Provide a system clock object
-extern Clock clock;
-
 #endif

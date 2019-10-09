@@ -187,10 +187,10 @@ void Timer::printInfo(Print* p) {
   Timer* t = _first;
   while (t) {
     i++;
-    p->printf(" Timer: %d :\n",t);
-    p->printf("  Remaining: %d\n", t->remainingMillis());
+    p->printf(" Timer: %d :\n",(int)t);
+    p->printf("  Remaining: %d\n", (int)t->remainingMillis());
     p->printf("  Millis: %d\n", (int)t->_millisTime);
-    p->printf("  Clocktime: %d\n", t->_clockTime);
+    p->printf("  Clocktime: %d\n", (int)t->_clockTime);
     p->println(t->_repeatTimer ? "  Repeating" : "  Not repeating");
     p->println(t->isPaused() ? "  Paused" : "  Not paused");
     t = t->_next;
