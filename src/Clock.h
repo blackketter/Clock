@@ -142,8 +142,6 @@ class LocalTime : public Time {
   // LocalTime's internal time is in the base (typically UTC) time, then the offset is applied to it
   public:
     LocalTime() {};
-    LocalTime(time_t t, Timezone* zone) { setZone(zone); setSeconds(t); }  // constructor makes sure that offset is set first
-    LocalTime(micros_t t, Timezone* zone) { setZone(zone); setMicros(t); }  // constructor makes sure that offset is set first
 
     virtual micros_t getMicros() { return Time::getMicros() + getZoneOffset(); };
     virtual void setMicros(micros_t newTime) {
@@ -189,6 +187,9 @@ class RTCClock : public LocalTime {
     void setUpdateInterval(time_t i) { _update_interval = i * microsPerSec; }
     time_t getUpdateInterval() { return _update_interval / microsPerSec; }
 
+    virtual micros_t getRTCMicros() { return getMicros(); };
+    virtual void setRTCMicros(micros_t newTime) { setMicros(newTime); };
+
   protected:
     static micros_t _micros_offset;
     static bool _is_setting;
@@ -197,7 +198,7 @@ class RTCClock : public LocalTime {
     static micros_t _utc_micros_time;
 };
 
-#if defined(TEENSY)
+#if defined(CORE_TEENSY)
 // On Teensy, the Clock is tied to the Teensy3 RTC
 class TeensyClock : public RTCClock {
   public:

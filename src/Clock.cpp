@@ -5,6 +5,17 @@
 
 static  const uint8_t monthDays[]={31,28,31,30,31,30,31,31,30,31,30,31}; // API starts months from 1, this array starts from 0
 
+#include <stdarg.h>
+int pprintf(Print* p, const char *format, ...)
+{
+	va_list ap;
+	va_start(ap, format);
+#ifdef __STRICT_ANSI__
+	return 0;  // TODO: make this work with -std=c++0x
+#else
+	return vdprintf((int)p, format, ap);
+#endif
+}
 
 ///////////////////////////
 micros_t Time::getMicros() {
@@ -111,19 +122,19 @@ void Time::longTime(char * timeStr) {
 };
 
 void Time::longDate(Print& p) {
-  p.printf("%s, %s %d, %d", dayStrings[weekday()], monthStrings[month()], day(), year());
+  pprintf(&p, "%s, %s %d, %d", dayStrings[weekday()], monthStrings[month()], day(), year());
 }
 
 void Time::shortDate(Print& p) {
-  p.printf("%d-%02d-%02d", year(), month(), day());
+  pprintf(&p, "%d-%02d-%02d", year(), month(), day());
 }
 
 void Time::shortTime(Print& p) {
-  p.printf("%d:%02d %s", hourFormat12(), minute(), isAM() ? "am":"pm");
+  pprintf(&p, "%d:%02d %s", hourFormat12(), minute(), isAM() ? "am":"pm");
 };
 
 void Time::longTime(Print& p) {
-  p.printf("%d:%02d:%02d %s", hourFormat12(), minute(), second(), isAM() ? "am":"pm");
+  pprintf(&p, "%d:%02d:%02d %s", hourFormat12(), minute(), second(), isAM() ? "am":"pm");
 };
 
 
@@ -146,16 +157,16 @@ micros_t Uptime::micros() {
 void Uptime::longTime(Print& p) {
   time_t s = seconds();
   int t = s/secsPerDay;
-  if (t) p.printf( "%d days, ", t);
+  if (t) pprintf(&p,  "%d days, ", t);
 
   t = (s%secsPerDay)/secsPerHour;
-  if (t) p.printf( "%d hours, ", t);
+  if (t) pprintf(&p,  "%d hours, ", t);
 
   t = (s%secsPerHour)/secsPerMinute;
-  if (t) p.printf( "%d minutes, ", t);
+  if (t) pprintf(&p,  "%d minutes, ", t);
 
   t = s%secsPerMinute;
-  p.printf("%d seconds", t);
+  pprintf(&p, "%d seconds", t);
 }
 //////////////////////////////////////////////////////////////////////////////
 // DayTime Methods
@@ -244,7 +255,7 @@ void TeensyClock::setMicros(micros_t newTime) {
   _zone = savedZone;
 
 }
-
+#if defined(TEENSY31) || defined(TEENSY36)
 millis_t TeensyClock::getRTCMicros() {
   uint32_t read1, read2, secs, us = 0;
     do {
@@ -284,5 +295,16 @@ void TeensyClock::setRTCMicros(micros_t newTime) {
   RTC_TSR = secs;
   RTC_SR = RTC_SR_TCE;
 }
+#else
+
+// TODO: Add Teensy40 specific sub-second RTC setter/getter
+void TeensyClock::setRTCMicros(micros_t newTime) {
+  Teensy3Clock.set((time_t)(newTime / microsPerSec));
+}
+
+millis_t TeensyClock::getRTCMicros() {
+  return   microsPerSec * (millis_t)Teensy3Clock.get();
+}
+#endif
 
 #endif // defined(CORE_TEENSY)

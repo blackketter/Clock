@@ -1,7 +1,8 @@
 #include "Timer.h"
 #include "Clock.h"
+#include "pprintf.h"
 
-extern Clock clock;
+Clock timerClock;
 
 Timer* Timer::_first = nullptr;
 
@@ -13,7 +14,7 @@ Timer::~Timer() {
 void Timer::setClockTime(time_t clockTimeSet) {
   cancel();
   _clockTime = clockTimeSet;
-  _millisDur = (clockTimeSet-clock.now())*1000;
+  _millisDur = (clockTimeSet-timerClock.now())*1000;
   insert();
 }
 
@@ -53,14 +54,14 @@ time_t Timer::remainingSecs() {
     if (isPaused()) {
       return -_clockTime;
     } else {
-      return (_clockTime - clock.now());
+      return (_clockTime - timerClock.now());
     }
   }
   return remainingSecs;
 }
 
 time_t Timer::timeInSecs() {
-  return clock.now()+remainingSecs();
+  return timerClock.now()+remainingSecs();
 }
 
 millis_t Timer::timeInMillis() {
@@ -84,7 +85,7 @@ bool Timer::hasPassed() {
       return true;
     }
   } else if (_clockTime) {
-    if (clock.now() >= _clockTime) {
+    if (timerClock.now() >= _clockTime) {
       return true;
     }
   }
@@ -112,7 +113,7 @@ void Timer::pause() {
   if (_millisTime) {
     _millisTime = -(_millisTime - Uptime::millis());
   } else if (_clockTime) {
-    _clockTime = -(_clockTime - clock.now());
+    _clockTime = -(_clockTime - timerClock.now());
   }
 }
 
@@ -123,7 +124,7 @@ void Timer::resume() {
   if (_millisTime) {
     _millisTime = Uptime::millis() - _millisTime;
   } else if (_clockTime) {
-    _clockTime = clock.now() - _clockTime;
+    _clockTime = timerClock.now() - _clockTime;
   }
 }
 
@@ -187,15 +188,15 @@ void Timer::printInfo(Print* p) {
   Timer* t = _first;
   while (t) {
     i++;
-    p->printf(" Timer: %d :\n",t);
-    p->printf("  Remaining: %d\n", t->remainingMillis());
-    p->printf("  Millis: %d\n", (int)t->_millisTime);
-    p->printf("  Clocktime: %d\n", t->_clockTime);
+    pprintf(p, " Timer: %d :\n",(int)t);
+    pprintf(p, "  Remaining: %d\n", (int)t->remainingMillis());
+    pprintf(p, "  Millis: %d\n", (int)t->_millisTime);
+    pprintf(p, "  Clocktime: %d\n", (int)t->_clockTime);
     p->println(t->_repeatTimer ? "  Repeating" : "  Not repeating");
     p->println(t->isPaused() ? "  Paused" : "  Not paused");
     t = t->_next;
   }
-  p->printf("Timer count:%d\n", i);
+  pprintf(p, "Timer count:%d\n", i);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
