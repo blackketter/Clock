@@ -1,23 +1,11 @@
 #include <stdio.h>
 #include <Arduino.h>
 #include "Clock.h"
-#include "Time.h"
+#include "TimeLib.h"
+#include "pprintf.h"
 
 static  const uint8_t monthDays[]={31,28,31,30,31,30,31,31,30,31,30,31}; // API starts months from 1, this array starts from 0
 
-#include <stdarg.h>
-int pprintf(Print* p, const char *format, ...)
-{
-	va_list ap;
-	va_start(ap, format);
-#ifdef __STRICT_ANSI__
-	return 0;  // TODO: make this work with -std=c++0x
-#else
-	return vdprintf((int)p, format, ap);
-#endif
-}
-
-///////////////////////////
 micros_t Time::getMicros() {
   return _micros_time;
 }
@@ -251,6 +239,7 @@ void TeensyClock::setMicros(micros_t newTime) {
   _zone = nullptr;
 
   setRTCMicros(getMicros());
+
 
   _zone = savedZone;
 
