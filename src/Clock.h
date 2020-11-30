@@ -207,14 +207,14 @@ class RTCClock : public LocalTime {
     virtual void beginSetTime() { _is_setting = true;}
     virtual void endSetTime() { _is_setting = false; }
 
+    virtual micros_t getRTCMicros() = 0;
+    virtual void setRTCMicros(micros_t newTime) = 0;
     virtual void updateTime() = 0;
+
     time_t lastUpdate() { return _last_update/microsPerSec; }
 
     void setUpdateInterval(time_t i) { _update_interval = i * microsPerSec; }
     time_t getUpdateInterval() { return _update_interval / microsPerSec; }
-
-    virtual micros_t getRTCMicros() { return getMicros(); };
-    virtual void setRTCMicros(micros_t newTime) { setMicros(newTime); };
 
   protected:
     static micros_t _micros_offset;
@@ -250,7 +250,10 @@ class Clock : public RTCClock {
   public:
     Clock(Timezone* zone) { setZone(zone); }
     Clock() {};
+
     virtual void updateTime() { };
+    virtual micros_t getRTCMicros() { return getMicros(); };
+    virtual void setRTCMicros(micros_t newTime) { setMicros(newTime); };
 };
 #endif
 

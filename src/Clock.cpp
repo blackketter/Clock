@@ -205,7 +205,7 @@ micros_t RTCClock::getMicros() {
 }
 
 bool RTCClock::hasBeenSet() {
-  return (_micros_offset != 0) && !_is_setting && (year() > 2016);
+  return (_micros_offset != 0) && !_is_setting && (year() >= 2020);
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -223,6 +223,7 @@ void TeensyClock::updateTime() {
   Timezone* savedZone = getZone();
   setZone(nullptr);
 
+  // set the object time to the hardware RTC time
   RTCClock::setMicros(getRTCMicros());
 
   setZone(savedZone);
@@ -237,13 +238,14 @@ void TeensyClock::setMicros(micros_t newTime) {
   Timezone* savedZone = getZone();
   setZone(nullptr);
 
+  // set the hardware RTC to the new time (without a zone)
   setRTCMicros(getMicros());
 
   setZone(savedZone);
 
 }
-#if defined(TEENSY31) || defined(TEENSY36)
-millis_t TeensyClock::getRTCMicros() {
+#if defined(ARDUINO_TEENSY31) || defined(ARDUINO_TEENSY36)
+micros_t TeensyClock::getRTCMicros() {
   uint32_t read1, read2, secs, us = 0;
     do {
       read1 = RTC_TSR;
@@ -282,16 +284,52 @@ void TeensyClock::setRTCMicros(micros_t newTime) {
   RTC_TSR = secs;
   RTC_SR = RTC_SR_TCE;
 }
-#else
 
-// TODO: Add Teensy40 specific sub-second RTC setter/getter
-void TeensyClock::setRTCMicros(micros_t newTime) {
-  Teensy3Clock.set((time_t)(newTime / microsPerSec));
+#elif defined(ARDUINO_TEENSY40) || defined(ARDUINO_TEENSY41)
+
+// Sub-second time setting/getting on Teensy4
+void TeensyClock::setRTCMicros(micros_t newTime)
+{
+  uint32_t secs = newTime / microsPerSec;
+  micros_t frac = newTime % microsPerSec;
+  uint32_t ticks = (frac * 32768)/microsPerSec;
+
+  uint32_t hi, lo;
+  hi = secs >> 17;
+  lo = (secs << 15) + ticks;
+  // stop the RTC
+  SNVS_HPCR &= ~(SNVS_HPCR_RTC_EN | SNVS_HPCR_HP_TS);
+  while (SNVS_HPCR & SNVS_HPCR_RTC_EN) ; // wait
+  // stop the SRTC
+  SNVS_LPCR &= ~SNVS_LPCR_SRTC_ENV;
+  while (SNVS_LPCR & SNVS_LPCR_SRTC_ENV); // wait
+  // set the SRTC
+  SNVS_LPSRTCLR = lo;
+  SNVS_LPSRTCMR = hi;
+  // start the SRTC
+  SNVS_LPCR |= SNVS_LPCR_SRTC_ENV;
+  while (!(SNVS_LPCR & SNVS_LPCR_SRTC_ENV)); // wait
+  // start the RTC and sync it to the SRTC
+  SNVS_HPCR |= SNVS_HPCR_RTC_EN | SNVS_HPCR_HP_TS;
 }
 
-millis_t TeensyClock::getRTCMicros() {
-  return   microsPerSec * (millis_t)Teensy3Clock.get();
+micros_t TeensyClock::getRTCMicros() {
+	uint32_t hi1 = SNVS_HPRTCMR;
+	uint32_t lo1 = SNVS_HPRTCLR;
+	while (1) {
+		uint32_t hi2 = SNVS_HPRTCMR;
+		uint32_t lo2 = SNVS_HPRTCLR;
+		if (lo1 == lo2 && hi1 == hi2) {
+		  uint32_t secs = (hi2 << 17) | (lo2 >> 15);
+		  uint32_t frac = lo2 & 0x7fff;
+
+		  return ((micros_t)secs * microsPerSec) + ((micros_t)frac * microsPerSec)/32768;
+		}
+		hi1 = hi2;
+		lo1 = lo2;
+	}
 }
+
 #endif
 
 #endif // defined(CORE_TEENSY)
