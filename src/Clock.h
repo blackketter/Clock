@@ -4,6 +4,7 @@
 #include "inttypes.h"
 #include "Print.h"
 #include "Timezone.h"
+#include "Timezones.h"
 
 
 #if !defined(__time_t_defined) // avoid conflict with newlib or other posix libc
@@ -142,7 +143,6 @@ class Uptime : public Time {
 class LocalTime : public Time {
   // LocalTime's internal time is in the base (typically UTC) time, then the offset is applied to it
   public:
-    LocalTime() {};
 
     virtual micros_t getMicros() { return Time::getMicros() + getZoneOffset(); };
     virtual void setMicros(micros_t newTime) {
@@ -155,13 +155,38 @@ class LocalTime : public Time {
     };
 
     void setZone(Timezone* zone) { _zone = zone; }
-    inline Timezone* getZone(void) { return _zone; }
+    inline Timezone* getZone(void) {
+      if (_zone)
+        return _zone;
+      else
+        return _systemtimezone;
+    }
 
-    stime_t getZoneOffset() { return _zone ? _zone->offset(getSeconds()) : 0; }
-    TimeChangeRule* getZoneRule() { return _zone ? _zone->rule(getSeconds()) : nullptr; }
+    stime_t getZoneOffset() {
+      if (_zone) {
+        return _zone->offset(getSeconds());
+      } else {
+        return _systemtimezone->offset(getSeconds());
+      }
+    }
+    TimeChangeRule* getZoneRule() {
+      if (_zone) {
+        return _zone->rule(getSeconds());
+      } else {
+        return _systemtimezone->rule(getSeconds());
+      }
+    }
 
-  protected:
-      Timezone* _zone = nullptr;
+    static void setSystemTimezone(Timezone* systemTimezone) {
+      if (systemTimezone) {
+       _systemtimezone = systemTimezone;
+      } else {
+       _systemtimezone = &UTC;
+      }
+    }
+  private:
+    Timezone* _zone = nullptr;
+    static Timezone* _systemtimezone;
 };
 
 // RTCClock is an abstract class that provides a Time
@@ -199,7 +224,8 @@ class RTCClock : public LocalTime {
     static micros_t _utc_micros_time;
 };
 
-#if defined(CORE_TEENSY)
+#if defined(CORE_TEENSY) && !defined(ARDUINO_TEENSYLC)
+#define TEENSY_CLOCK
 // On Teensy, the Clock is tied to the Teensy3 RTC
 class TeensyClock : public RTCClock {
   public:
@@ -213,6 +239,9 @@ class TeensyClock : public RTCClock {
 };
 
 class Clock : public TeensyClock {
+  public:
+    Clock(Timezone* zone) : TeensyClock(zone) {}
+    Clock() : TeensyClock() {}
 };
 
 #else

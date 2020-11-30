@@ -3,23 +3,26 @@
 #include <stdio.h>
 #include <stdarg.h>
 
+#if 0
+// ESP32/8266 have broken vdprintfs
 int pprintf(Print* p, const char *format, ...)
 {
 	va_list ap;
 	va_start(ap, format);
-	return vdprintf((int)p, format, ap);
+	int result = vdprintf((int)p, format, ap);
+	va_end(ap);
+	return result;
 }
+#endif
 
-#if 0
-
-size_t pprintf(Print* p, const char *format, ...) {
+int pprintf(Print* p, const char *format, ...) {
     va_list arg;
     va_start(arg, format);
     char temp[64];
     char* buffer = temp;
-    size_t len = vsnprintf(temp, sizeof(temp), format, arg);
+    int len = vsnprintf(temp, sizeof(temp), format, arg);
     va_end(arg);
-    if (len > sizeof(temp) - 1) {
+    if (len > (int)sizeof(temp) - 1) {
         buffer = new char[len + 1];
         if (!buffer) {
             return 0;
@@ -35,4 +38,3 @@ size_t pprintf(Print* p, const char *format, ...) {
     return len;
 }
 
-#endif

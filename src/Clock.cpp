@@ -156,6 +156,9 @@ void Uptime::longTime(Print& p) {
   t = s%secsPerMinute;
   pprintf(&p, "%d seconds", t);
 }
+
+Timezone* LocalTime::_systemtimezone = &UTC;
+
 //////////////////////////////////////////////////////////////////////////////
 // DayTime Methods
 //
@@ -175,15 +178,13 @@ time_t DayTime::nextOccurance(time_t starting) {
 micros_t RTCClock::_update_interval = 0;
 micros_t RTCClock::_last_update = 0;
 micros_t RTCClock::_micros_offset = 0;
-micros_t RTCClock::_utc_micros_time = 0;
+micros_t RTCClock::_utc_micros_time = Time::microsPerYear * (2000-1970);  // THE YEAR 2000
 bool RTCClock::_is_setting = false;
 
 void RTCClock::setMicros(micros_t newTime) {
   _micros_offset = Uptime::micros();
   micros_t zone_offset = 0;
-  if (_zone) {
-    zone_offset = microsPerSec * _zone->offset(_zone->toUTC(newTime/microsPerSec));
-  }
+  zone_offset = microsPerSec * getZone()->offset(getZone()->toUTC(newTime/microsPerSec));
   _utc_micros_time = newTime - zone_offset;
 }
 
@@ -198,9 +199,7 @@ micros_t RTCClock::getMicros() {
   micros_t zone_offset = 0;
   micros_t utc_now = _utc_micros_time + up - _micros_offset;
 
-  if (_zone) {
-    zone_offset = microsPerSec * _zone->offset(utc_now/microsPerSec);
-  }
+  zone_offset = microsPerSec * getZone()->offset(utc_now/microsPerSec);
 
   return utc_now + zone_offset;
 }
@@ -212,7 +211,7 @@ bool RTCClock::hasBeenSet() {
 //////////////////////////////////////////////////////////////////////////////
 //  Teensy Clock Methods
 //
-#if defined(CORE_TEENSY)
+#if defined(TEENSY_CLOCK)
 
 TeensyClock::TeensyClock() {
   updateTime();
@@ -221,12 +220,12 @@ TeensyClock::TeensyClock() {
 
 void TeensyClock::updateTime() {
   _last_update = Uptime::micros();
-  Timezone* savedZone = _zone;
-  _zone = nullptr;
+  Timezone* savedZone = getZone();
+  setZone(nullptr);
 
   RTCClock::setMicros(getRTCMicros());
 
-  _zone = savedZone;
+  setZone(savedZone);
 
 }
 
@@ -235,13 +234,12 @@ void TeensyClock::setMicros(micros_t newTime) {
 
   RTCClock::setMicros(newTime);
 
-  Timezone* savedZone = _zone;
-  _zone = nullptr;
+  Timezone* savedZone = getZone();
+  setZone(nullptr);
 
   setRTCMicros(getMicros());
 
-
-  _zone = savedZone;
+  setZone(savedZone);
 
 }
 #if defined(TEENSY31) || defined(TEENSY36)
